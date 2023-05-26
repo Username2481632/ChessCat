@@ -2990,19 +2990,12 @@ bool GreaterOutcome(const Position* position1, const Position* position2) {
   return position1->evaluation > position2->evaluation;
 }
 Position* GetBestMove(const Position* position) {
-  Position* best_move = (*position->outcomes)[0];
-  for (int i = 1; i < position->outcomes->size(); i++) {
-     if (position->to_move == 'W') {
-       if ((*position->outcomes)[i]->evaluation > best_move->evaluation) {
-         best_move = (*position->outcomes)[i];
-       }
-     } else {
-       if ((*position->outcomes)[i]->evaluation < best_move->evaluation) {
-         best_move = (*position->outcomes)[i];
-       }
+  for (int i = 0; i < position->outcomes->size(); i++) {
+     if ((*position->outcomes)[i]->evaluation == position->evaluation) {
+       return (*position->outcomes)[i];
      }
   }
-  return best_move;
+  return nullptr;
 }
 
 int default_max_depth_extension = -3;
@@ -3194,6 +3187,8 @@ void minimax(Position& position, int depth, double alpha, double beta,
       position.depth = depth;
     }
   }
+  //Position* best_move = GetBestMove(&position);
+  //assert(best_move->evaluation == position.evaluation);
  
 }
 
@@ -3652,7 +3647,11 @@ std::string GetMove(Position& position1, Position& position2,
       output << (char)('a' + dest.column) << (8 - dest.row);
       break;
     case 'K':
-      output << 'K' << (char)('a' + dest.column) << (8 - dest.row);
+      output << 'K';
+      if (position1.board[dest.row][dest.column].color != ' ') {
+        output << 'x';
+      }
+      output << (char)('a' + dest.column) << (8 - dest.row);
       break;
       
 
