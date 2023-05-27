@@ -135,16 +135,16 @@ struct Position {
   std::vector<Position*>* outcomes;
   int depth;
   //Position* best_move;
+  Position* previous_move;
   Kings kings;
   Point en_passant_target;
   int fifty_move_rule;
-  bool was_capture;
-  //bool was_forced;
+
 
   Position(bool wtm, int n, double e, Board b,
            Castling c /*, time_t t*/, char tm,
-           std::vector<Position*>* o /*,
-           Position* pm*/, int d, /*Position* bm,*/Kings k, Point ept, int fmc, bool wc)
+           std::vector<Position*>* o,
+           Position* pm, int d, /*Position* bm,*/Kings k, Point ept, int fmc)
       : white_to_move(wtm),
         number(n),
         evaluation(e),
@@ -153,13 +153,12 @@ struct Position {
         //time(t),
         to_move(tm),
         outcomes(o),
-        //previous_move(pm),
+        previous_move(pm),
         depth(d),
         //best_move(bm),
         kings(k),
         en_passant_target(ept),
-        fifty_move_rule(fmc),
-  was_capture(wc) {
+        fifty_move_rule(fmc) {
     //boards_created++;
   }
   /*Position(const Board& b, const Castling& c, time_t ti, char to)
@@ -169,15 +168,14 @@ struct Position {
   // Possibilities possibilities;
 
   static Position* StartingPosition() {
-    return new Position(true, 0, 0.0, starting_board, Castling(true, true, true, true), 'W', new std::vector<Position*>, 0, Kings(Point(7, 4), Point(0, 4)), Point(-1, -1), 0, false);
+    return new Position(true, 0, 0.0, starting_board, Castling(true, true, true, true), 'W', new std::vector<Position*>, nullptr, 0, Kings(Point(7, 4), Point(0, 4)), Point(-1, -1), 0);
   }
 
-  Position CreateShallowCopy() {
+  Position GenerateMovesCopy() {
     return Position(!white_to_move, number + 1, evaluation, board, castling,
-                    /*time, */to_move, nullptr /* outcomes *//*,
-                    nullptr *//* previous_move */, depth - 1, /*
+                    /*time, */to_move,  nullptr /* outcomes */, this/* previous_move */, depth - 1, /*
                     nullptr /* best_move */
-                    /*, */ kings, Point(-1, -1), fifty_move_rule + 1, false);
+                    /*, */ kings, Point(-1, -1), fifty_move_rule + 1);
   }
   ~Position() {
     // delete all outcomes pointers
@@ -194,16 +192,16 @@ struct Position {
 
   Position* CreateDeepCopy() {
     Position* new_position = new Position(white_to_move, number, evaluation, board, castling, /*time, */to_move,
-        nullptr /* outcomes *//*, nullptr *//* previous_move */, depth /*,
-        nullptr *//* best_move */, kings, en_passant_target, fifty_move_rule, was_capture);
+        nullptr /* outcomes */, previous_move /* previous_move */, depth /*,
+        nullptr *//* best_move */, kings, en_passant_target, fifty_move_rule);
     return new_position;
   }
-  Position* RealDeepCopy() const {
+  Position* RealDeepCopy() const { // previous move is not a deep copy
     Position* new_position = new Position(
         white_to_move, number, evaluation, board, castling /*, time*/,
         to_move,
-        nullptr /* outcomes *//*, nullptr *//* previous_move */, depth /*,
-        nullptr *//* best_move */, kings, en_passant_target, fifty_move_rule, was_capture);
+        nullptr /* outcomes */, previous_move /* previous_move */, depth /*,
+        nullptr *//* best_move */, kings, en_passant_target, fifty_move_rule);
 
     if (outcomes) {
       new_position->outcomes = new std::vector<Position*>;
@@ -1549,7 +1547,7 @@ bool board_exists(const Position& position, const Position& new_position) {
 
 
 void new_generate_moves(Position& position) {
-  Position base_position = position.CreateShallowCopy();
+  Position base_position = position.GenerateMovesCopy();
   //base_position.previous_move = &position;
   char opponent = position.white_to_move ? 'B' : 'W';
   base_position.to_move = opponent;
@@ -1661,7 +1659,6 @@ void new_generate_moves(Position& position) {
                 new_position->board[i + multiplier][j - 1].type =
                     promotion_pieces[k];
                 new_position->board[i][j].empty();
-                new_position->was_capture = true;
                 new_position->fifty_move_rule = 0;
                 new_position->evaluation +=
                     (-
@@ -1677,7 +1674,6 @@ void new_generate_moves(Position& position) {
                 new_position->board[new_i][j + 1].type =
                     promotion_pieces[k];
                 new_position->board[i][j].empty();
-                new_position->was_capture = true;
                 new_position->fifty_move_rule = 0;
                 new_position->evaluation +=
                     (-multiplier *
@@ -1715,7 +1711,6 @@ void new_generate_moves(Position& position) {
               new_position->board[new_i][j - 1] =
                   new_position->board[i][j];
               new_position->board[i][j].empty();
-              new_position->was_capture = true;
               new_position->evaluation +=
                   (-multiplier *
                    piece_values[position.board[new_i][j - 1].type]);
@@ -1731,7 +1726,6 @@ void new_generate_moves(Position& position) {
               new_position->board[i + multiplier][j + 1] =
                   new_position->board[i][j];
               new_position->board[i][j].empty();
-              new_position->was_capture = true;
               new_position->evaluation +=
                   (-multiplier *
                    piece_values[position.board[new_i][j + 1].type]);
@@ -1816,7 +1810,6 @@ void new_generate_moves(Position& position) {
                     new_position->board[i][j];
                 new_position->board[i][j].empty();
                 new_position->board[i][j - 1].empty();
-                new_position->was_capture = true;
                 new_position->evaluation -= multiplier;
                 new_position->fifty_move_rule = 0;
                 position.outcomes->emplace_back(new_position);
@@ -1899,7 +1892,6 @@ void new_generate_moves(Position& position) {
                 new_position->board[i][j].empty();
                 new_position->board[i][j + 1].color =
                     new_position->board[i][j + 1].type = ' ';
-                new_position->was_capture = true;
                 new_position->evaluation -= multiplier;
                 new_position->fifty_move_rule = 0;
                 position.outcomes->emplace_back(new_position);
@@ -1922,7 +1914,6 @@ void new_generate_moves(Position& position) {
               new_position->board[new_i][new_j] = position.board[i][j];
               new_position->board[i][j].empty();
               if (!position.board[new_i][new_j].IsEmpty()) {
-                new_position->was_capture = true;
                 new_position->evaluation +=
                     (evaluation_multiplier *
                      piece_values[position.board[new_i][new_j].type]);
@@ -1952,7 +1943,6 @@ void new_generate_moves(Position& position) {
                 new_position->board[i][j].empty();
                 if (!position.board[new_i][new_j]
                                      .IsEmpty()) {
-                  new_position->was_capture = true;
                   new_position->fifty_move_rule = 0;
                   new_position->evaluation +=
                       (evaluation_multiplier *
@@ -2000,7 +1990,6 @@ void new_generate_moves(Position& position) {
                     new_position->castling.black_o_o_o = false;
                   }
                   if (!position.board[new_i][new_j].IsEmpty()) {
-                    new_position->was_capture = true;
                     new_position->fifty_move_rule = 0;
                     new_position->evaluation +=
                         (evaluation_multiplier *
@@ -2035,7 +2024,6 @@ void new_generate_moves(Position& position) {
                       new_position->castling.black_o_o_o = false;
                 }
                 if (!position.board[new_i][new_j].IsEmpty()) {
-                  new_position->was_capture = true;
                   new_position->fifty_move_rule = 0;
                   new_position->evaluation +=
                       (evaluation_multiplier *
@@ -3795,7 +3783,7 @@ int main() {
   std::vector<Position*>* outcomes = nullptr;
   Position* position =
       new Position(to_move == 'W', number, 0.0, board, castling/*, 0LL*/, to_move,
-                   outcomes/*, previous_move*/, 0, /*nullptr,*/ kings, Point(-1, -1), 0, false);
+                   outcomes/*, previous_move*/, nullptr, 0, /*nullptr,*/ kings, Point(-1, -1), 0);
 
   std::cout << std::setprecision(7);
   
@@ -3994,7 +3982,7 @@ ComplicatedLessOutcome);
                                  // returns from the current function"
         if (!mental_chess) { // died with this
           std::cout << MakeString(*best_move, chess_notation, white_on_bottom) << std::endl;
-          std::cout << "Material evaluation: " << EvaluateMaterial(*best_move);
+          std::cout << "Material evaluation: " << EvaluateMaterial(*best_move) << std::endl;
           std::cout << "Evaluation on depth " << best_move->depth
                     << ": " << Convert(best_move->evaluation) << std::endl;
           std::cout << "Line: ";
@@ -4045,7 +4033,7 @@ ComplicatedLessOutcome);
     //move = GetMove(*position, (*(*position->outcomes)[0]), chess_notation);
     //std::cout << move << std::endl;
     //  stop = true;
-    lower_move = ToLower(move);
+     lower_move = ToLower(move);
     if (lower_move == "disable") {
       engine_on = false;
       continue;
@@ -4151,7 +4139,7 @@ ComplicatedLessOutcome);
       //printf("[main thread %d] acquire complete.\n", GetCurrentThreadId());
       if (!mental_chess) {
         std::cout << MakeString(*new_position, chess_notation, white_on_bottom) << std::endl;
-        std::cout << "Material evaluation: " << EvaluateMaterial(*new_position);
+        std::cout << "Material evaluation: " << EvaluateMaterial(*new_position) << std::endl;
         std::cout << "Evaluation on depth " << new_position->depth << ": "
                   << Convert(new_position->evaluation) << std::endl;
         std::cout << "Moves: " << new_position->outcomes->size() << std::endl
