@@ -2776,7 +2776,8 @@ void minimax(Position& position, int depth, double alpha, double beta,
             position.outcomes->end(),
             position.white_to_move ? GreaterOutcome : LessOutcome);*/
   //std::cout << time(NULL) - s;
-  for (int c = 0;
+  int c = 0;
+  for (;
        c < position.outcomes
                ->size() /* && (selective_deepening ? (abs(initial_evaluation -
                            (*position.outcomes)[c]->evaluation) < 3) : true)*/
@@ -2848,7 +2849,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
        break;
      }
   }
-  if (!*stop) {
+  if (!*stop && c == position.outcomes->size()) {
     if (depth <= 0) {
       position.depth = 1;
     } else {
@@ -3792,7 +3793,6 @@ int main() {
   if (resume) {
     //ReadPosition(*position);
     position = ReadPGN(position);
-    evaluate_position(*position);
   }
   else {
     std::ofstream file;
