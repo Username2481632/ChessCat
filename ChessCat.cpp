@@ -3724,6 +3724,23 @@ std::string ToLower(std::string input) {
   return output;
 }
 
+int EvaluateMaterial(const Position& position) {
+  int material = 0;
+  for (size_t i = 0; i < 8; i++) {
+    for (size_t j = 0; j < 8; j++) {
+      if (position.board[i][j].color == ' ' ||
+          position.board[i][j].type == 'K') {
+        continue;
+      }
+      if (position.board[i][j].color == 'W') {
+        material += piece_values[position.board[i][j].type];
+      } else {
+        material -= piece_values[position.board[i][j].type];
+      }
+    }
+  }
+  return material;
+}
 
 int CountMaterial(const Position& position) {
   int count = 0;
@@ -3977,7 +3994,9 @@ ComplicatedLessOutcome);
                                  // returns from the current function"
         if (!mental_chess) { // died with this
           std::cout << MakeString(*best_move, chess_notation, white_on_bottom) << std::endl;
-          std::cout << Convert(best_move->evaluation) << std::endl;
+          std::cout << "Material evaluation: " << EvaluateMaterial(*best_move);
+          std::cout << "Evaluation on depth " << best_move->depth
+                    << ": " << Convert(best_move->evaluation) << std::endl;
           std::cout << "Line: ";
           std::vector<Position*> line = GetLine(position);
           std::cout << GetMove(*position, *line[0], chess_notation);
@@ -4132,7 +4151,9 @@ ComplicatedLessOutcome);
       //printf("[main thread %d] acquire complete.\n", GetCurrentThreadId());
       if (!mental_chess) {
         std::cout << MakeString(*new_position, chess_notation, white_on_bottom) << std::endl;
-        std::cout << Convert(new_position->evaluation) << std::endl;
+        std::cout << "Material evaluation: " << EvaluateMaterial(*new_position);
+        std::cout << "Evaluation on depth " << new_position->depth << ": "
+                  << Convert(new_position->evaluation) << std::endl;
         std::cout << "Moves: " << new_position->outcomes->size() << std::endl
                   << "Material: " << (float)CountMaterial(*new_position) / 2.0
                   << std::endl;
