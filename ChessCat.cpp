@@ -2702,7 +2702,6 @@ void minimax(Position& position, int depth, double alpha, double beta,
      }
   }*/
 
-  bool white_to_move = position.to_move == 'W';
   if (depth <= 0/* && !selective_deepening*/) {
      // if (!position.was_capture || depth < max_depth_extension) {
      position.evaluation = round(position.evaluation);
@@ -2728,7 +2727,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
   if (position.outcomes->size() == 0) {
      if (InCheck(position, position.to_move)) {
        position.evaluation =
-           white_to_move ? (double)-mate + (double)position.number
+           position.white_to_move ? (double)-mate + (double)position.number
                          : (double)mate - (double)position.number;  // checkmate
      } else {
        position.evaluation = 0;  // draw by stalemate
@@ -2756,7 +2755,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
   //   int h = 2;
   //}
   //int multiplier = initial_evaluation > 0 ? -1 : 1;
-  position.evaluation = white_to_move ? INT_MIN : INT_MAX;
+  position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
 
 
   // time_t s = time(NULL);
