@@ -72,6 +72,11 @@ struct Point {
   Point(int r, int c) : row(r), column(c) {}
   void clear() { row = column = -1;
   }
+
+  bool operator==(const Point& other) const {
+    return row == other.row && column == other.column;
+  }
+
   bool operator<(const Point& other) const {
     if (row < other.row) return true;
     if (row > other.row) return false;
@@ -87,9 +92,14 @@ struct Castling {
   bool black_o_o_o : 1;
 
   bool operator!=(const Castling other) const {
+    return white_o_o != other.white_o_o || white_o_o_o != other.white_o_o_o ||
+           black_o_o != other.black_o_o || black_o_o_o != other.black_o_o_o;
+  };
+  bool operator==(const Castling other) const {
     return white_o_o == other.white_o_o && white_o_o_o == other.white_o_o_o &&
            black_o_o == other.black_o_o && black_o_o_o == other.black_o_o_o;
   };
+
 };
 
 using Board = std::vector<std::vector<Piece>>;
@@ -2672,35 +2682,24 @@ void minimax(Position& position, int depth, double alpha, double beta,
   if (*stop || position.depth >= depth/* && !selective_deepening)*/) {
      return;
   }
-  //bool deepened = false;
-
-  /*if (depth > 3 || position.depth < 0) {
-     if (deleting != 0) {
-       max_depth_extension = -3;
-     } else {
-       PROCESS_MEMORY_COUNTERS_EX pmc;
-       GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc,
-                            sizeof(pmc));
-       if (engine_to_move) {
-         if (pmc.WorkingSetSize > max_bytes) {
-          *stop = true;
-         } else if (pmc.WorkingSetSize > critical_bytes) {
-          max_depth_extension = 1;
-         } else if (pmc.WorkingSetSize > safe_bytes) {
-          max_depth_extension = -1;
-         } else {
-          max_depth_extension = -3;
-         }
-       } else {
-         if (pmc.WorkingSetSize > max_bytes) {
-          *stop = true;
-         } else {
-          max_depth_extension = -3;
+  if (position.fifty_move_rule >= 6) {
+     int occurrences = 1;
+     Position* previous_move = &position;
+     for (int i = 0; i < position.fifty_move_rule; i += 2) {
+       previous_move = previous_move->previous_move->previous_move;
+       if (previous_move->board == position.board &&
+           previous_move->castling == position.castling &&
+           previous_move->en_passant_target == position.en_passant_target) {
+         occurrences++;
+         if (occurrences == 3) {
+          position.evaluation = 0.0;
+          position.depth = 0;
+          return;
          }
        }
-
-     }
-  }*/
+    }
+  
+  }
 
   if (depth <= 0/* && !selective_deepening*/) {
      // if (!position.was_capture || depth < max_depth_extension) {
@@ -2712,14 +2711,6 @@ void minimax(Position& position, int depth, double alpha, double beta,
   }
 
   if (!position.outcomes) {
-     /*if (selective_deepening) {
-       if (!position.was_capture) {
-         return false;
-       }
-       depth = deepening_depth;
-       selective_deepening = false;
-       deepened = true;
-     }*/
      
      new_generate_moves(position);
   }
@@ -2971,23 +2962,6 @@ void calculate_moves(void* varg) {
         while (input->position->depth < min_depth && !*input->stop) {
           minimax(*input->position, input->position->depth + 1, INT_MIN, INT_MAX, input->stop);
         }
-        /*bool deepened = true;
-        PROCESS_MEMORY_COUNTERS_EX pmc;
-        GetProcessMemoryInfo(GetCurrentProcess(),
-                             (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
-        while ((deleting != 0 || pmc.WorkingSetSize < max_bytes) && deepened) {
-          deepened = minimax(*input->position, min_depth + 2, INT_MIN, INT_MAX, input->stop);
-          GetProcessMemoryInfo(GetCurrentProcess(),
-                               (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
-        }*/
-        //std::vector<Position*> line = GetLine(input->position);
-       /* while ((line.back()->was_capture || input->position->evaluation != line.back()->evaluation) && (deleting != 0 || pmc.WorkingSetSize < max_bytes)) {
-          minimax(*input->position, min_depth + 2, INT_MIN, INT_MAX, input->stop,
-                  true);
-          line = GetLine(input->position);
-          GetProcessMemoryInfo(GetCurrentProcess(),
-                               (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
-        }*/
         done = true;
         *input->stop = true;
         done_cv.notify_one();
@@ -3745,6 +3719,29 @@ int CountMaterial(const Position& position) {
   return count;
 }
 
+void LogGameEnd(const Position& position, const int &game_status) {
+  switch (game_status) {
+    case -1:
+      std::cout << "Black wins by checkmate." << std::endl;
+      break;
+    case 0:
+      if (position.fifty_move_rule == 50) {
+        std::cout << "Draw by fifty move rule." << std::endl;
+      } else if (position.outcomes->size() == 0) {
+        std::cout << "Draw by stalemate" << std::endl;
+      } else {
+        std::cout << "Draw by repetition." << std::endl;
+      }
+      break;
+    case 1:
+      std::cout << "White wins by checkmate." << std::endl;
+      break;
+    default:
+      std::cout << "Unexpected end of game." << std::endl;
+      exit(1);
+  }
+}
+
 
 int main() {
   thread_count++;
@@ -3910,24 +3907,7 @@ int main() {
       if (game_status != 2) {
         std::cout << std::endl;
         game_over = true;
-        switch (game_status) {
-          case -1:
-            std::cout << "Black wins by checkmate." << std::endl;
-            break;
-          case 0:
-            if (position->fifty_move_rule == 50) {
-              std::cout << "Draw by fifty move rule." << std::endl;
-            } else {
-              std::cout << "Draw by stalemate" << std::endl;
-            }
-            break;
-          case 1:
-            std::cout << "White wins by checkmate." << std::endl;
-            break;
-          default:
-            std::cout << "unexpected end of game.";
-            exit(1);
-        }
+        LogGameEnd(*position, game_status);
       } else {
         best_move = GetBestMove(position);
         if (!best_move->outcomes) {
@@ -3997,21 +3977,7 @@ ComplicatedLessOutcome);
         position = best_move;
         if (game_status != 2) {
           game_over = true;
-          switch (game_status) {
-            case -1:
-              std::cout << "Black wins by checkmate." << std::endl;
-              break;
-            case 0:
-              if (position->fifty_move_rule == 50) {
-                std::cout << "Draw by fifty move rule." << std::endl;
-              } else {
-                std::cout << "Draw by stalemate" << std::endl;
-              }
-              break;
-            case 1:
-              std::cout << "White wins by checkmate." << std::endl;
-              break;
-          }
+          LogGameEnd(*position, game_status);
         }
       }
 
