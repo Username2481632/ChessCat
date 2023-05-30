@@ -134,6 +134,8 @@ Board starting_board = {
     {Piece('W', 'R'), Piece('W', 'N'), Piece('W', 'B'), Piece('W', 'Q'),
      Piece('W', 'K'), Piece('W', 'B'), Piece('W', 'N'), Piece('W', 'R')}};
 
+
+
 struct Position {
   bool white_to_move;
   int number;
@@ -178,12 +180,13 @@ struct Position {
   // Possibilities possibilities;
 
   static Position* StartingPosition() {
-    return new Position(true, 0, 0.0, starting_board, Castling(true, true, true, true), 'W', new std::vector<Position*>, nullptr, 0, Kings(Point(7, 4), Point(0, 4)), Point(-1, -1), 0);
+    return new Position(true, 0, 0.0, starting_board, Castling(true, true, true, true), 'W', nullptr, nullptr, 0, Kings(Point(7, 4), Point(0, 4)), Point(-1, -1), 0);
   }
 
   Position GenerateMovesCopy() {
     return Position(!white_to_move, number + 1, evaluation, board, castling,
-                    /*time, */to_move,  nullptr /* outcomes */, this/* previous_move */, depth - 1, /*
+                    /*time, */ to_move, nullptr /* outcomes */,
+                    this /* previous_move */, -1 /*depth*/, /*
                     nullptr /* best_move */
                     /*, */ kings, Point(-1, -1), fifty_move_rule + 1);
   }
@@ -707,7 +710,7 @@ double EvaluateMobility(Position& position) {
       if (position.board[i][j].color == ' ') {
         continue;
       }
-      int moves = 0;
+      double moves = 0;
       if (position.board[i][j].type == 'K') {
         for (int k = 0; k < 8; k++) {
           new_i = (int)i + king_moves[k][0];
@@ -755,7 +758,7 @@ double EvaluateMobility(Position& position) {
 
             if (position.board[new_i][j].color == ' ') {
               if (MoveOk(*check, (int)i, (int)j, new_i, (int)j)) {
-                moves += 4;
+                moves += 2;
               }
             }
             // captures to the left
@@ -771,14 +774,14 @@ double EvaluateMobility(Position& position) {
           } else if (position.board[new_i][j].color == ' ') {
             // one square forward
             if (MoveOk(*check, i, j, new_i, j)) {
-              moves++;
+              moves += 0.5;
             }
             // two squares forward
             if (i == starting_row &&
                 position.board[i + multiplier][j].color == ' ' && 
                 position.board[jump_row][j].color == ' ' &&
                 MoveOk(*check, i, j, jump_row, j)) {
-              moves++;
+              moves += 0.5;
             }
           } else {
             if (left_capture &&
@@ -1012,7 +1015,6 @@ double EvaluateMobility(Position& position) {
       }
 
       if (position.board[i][j].color == 'W') {
-        double p_m = mobility_score;
         mobility_score +=
             ((double)moves / piece_values[position.board[i][j].type]);
       } else {
@@ -1049,118 +1051,13 @@ bool was_capture(const Board& board1, const Board& board2) {
 
 const char promotion_pieces[4] = {'Q', 'R', 'B', 'N'};
 
-// void CopyBoard(std::string dest[8][8], const std::string src[8][8]) {
-//     for (int i = 0; i < 8; i++)
-//         for (int j = 0; j < 8; j++)
-//             dest[i][j] = src[i][j];
-// }
-
-// void CopyCastling(bool src[4], bool dst[4]) {
-//     for (int i = 0; i < 4; i++) {
-//         dst[i] = src[i];
-//     }
-// }
-
-// void CopyHistory(HistoryType& dst, HistoryType& src) {
-//     for (int i = 0; i < src.size(); i++) {
-//         dst[i] = src[i];
-//     }
-// }
 
 int char_to_int(char c) { return (int)c - int('0'); }
 
 const std::set<char> pieces = {'K', 'Q', 'R', 'B', 'N'};
 
-// Board GetBoard(char piece, int dest[2],
-//                          int start[2] /*might be unknown*/, bool capture,
-//                          bool check, const Position& position) {
-//  int new_i, new_j;
-//  char other_color = position.to_move == 'W' ? 'B' : 'W';
-//  Board new_board = position.board;
-//  std::string object = position.to_move + piece;
-//  switch (piece) {
-//    case 'P': {
-//      int multiplier = position.to_move == 'W' ? -1 : 1;
-//      if (capture) {
-//        if (start[0] != -1) {
-//          new_board[dest[0] - multiplier][start[0]] = "  ";
-//          new_board[dest[0]][dest[1]] = object;
-//        } else {
-//          if (new_board[dest[0] - multiplier][dest[1] - 1] == object) {
-//            new_board[dest[0] - multiplier][dest[1] - 1] = "  ";
-//            new_board[dest[0]][dest[1]] = piece + position.to_move;
-//          } else if (new_board[dest[0] - multiplier][dest[1] + 1] == object) {
-//            new_board[dest[0] - multiplier][dest[1] + 1] = "  ";
-//            new_board[dest[0]][dest[1]] = piece + position.to_move;
-//          } else if (new_board[dest[0]][dest[1] + 1] == object) {
-//            //new // en passant
-//          }
-//        }
-//      } else {
-//        if (new_board[dest[0] - multiplier][dest[1]] == object) {
-//          new_board[dest[0] - multiplier][dest[1]] = "  ";
-//          new_board[dest[0]][dest[1]] = object;
-//        } else if (new_board[dest[0] - (multiplier * 2)][dest[1]] ==
-//                             object) {
-//          new_board[dest[0] - (multiplier * 2)][dest[1]] = "  ";
-//          new_board[dest[0]][dest[1]] = object;
-//        }
-//      }
-//      return new_board;
-//      break;
-//    }
-//    case 'N':
-//      for (int k = 0; k < 8; k++) {
-//        if (new_board[dest[0] + knight_moves[k][0]][dest[1] +
-//        knight_moves[k][1]]
-//                 [0] == position.to_move &&
-//            new_board[dest[0] + knight_moves[k][0]][dest[1] +
-//            knight_moves[k][1]]
-//                 [1] == 'N' &&
-//            (start[0] != -1 ? dest[0] + knight_moves[k][0] == start[0]
-//                            : true) &&
-//            (start[1] != -1 ? dest[1] + knight_moves[k][1] == start[1]
-//                            : true)) {
-//          new_board[dest[0] + knight_moves[k][0]][dest[1] +
-//          knight_moves[k][1]] = "  "; new_board[dest[0]][dest[1]] = object;
-//          return new_board;
-//        }
-//      }
-//      break;
-//    case 'B':
-//      for (int k = 0; k < 4; k++) {
-//        new_i = dest[0] + bishop_moves[k][0];
-//        new_j = dest[1] + bishop_moves[k][1];
-//        while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-//          if (board[new_i][new_j][0] == other_color) {
-//            break;
-//          }
-//          if (board[new_i][new_j][1] == 'B' &&
-//              board[new_i][new_j][0] == color &&
-//              (start[0] != -1 ? new_i == start[0] : true) &&
-//              (start[1] != -1 ? new_j == start[1] : true)) {
-//            return {new_i, new_j};
-//          }
-//          new_i += bishop_moves[k][0];
-//          new_j += bishop_moves[k][1];
-//        }
-//      }
-//      break;
-//  }
-//}
 const int mate = 10000;
 
-// bool king_present(const Position& position) {
-//   for (int i = 0; i < 8; i++) {
-//     for (int j = 0; j < 8; j++) {
-//       if (position.board[i][j][0] == position.to_move &&
-//           position.board[i][j][1] == 'K') {
-//         return true;
-//       }
-//     }
-//   }
-//   return false;
-// }
 
 
 
@@ -1176,379 +1073,6 @@ bool board_exists(const Position& position, const Position& new_position) {
   return false;
 }
 
-//void generate_moves(Position& position) {
-//  Position base_position = position.CreateShallowCopy();
-//  base_position.previous_move = &position;
-//  char opponent = position.to_move == 'W' ? 'B' : 'W';
-//  base_position.to_move = opponent;
-//  Position* new_position;
-//  if (position.outcomes == nullptr) {
-//    position.outcomes = new std::vector<Position*>;
-//  }
-//
-//  int new_i, new_j;
-//  for (int i = 0; i < 8; i++) {
-//    for (int j = 0; j < 8; j++) {
-//      if (position.board[i][j].color != position.to_move) {
-//        continue;
-//      }
-//      switch (position.board[i][j].type) {
-//        case 'P': {
-//          int multiplier, promotion_row, starting_row;
-//          if (position.to_move == 'W') {
-//            multiplier = -1;
-//            starting_row = 6;
-//            promotion_row = 1;
-//          } else {
-//            multiplier = 1;
-//            starting_row = 1;
-//            promotion_row = 6;
-//          }
-//          bool left_capture =
-//              j > 0 && position.board[i + multiplier][j - 1].color == opponent;
-//          bool right_capture =
-//              j < 7 && position.board[i + multiplier][j + 1].color == opponent;
-//
-//          if (i == promotion_row) {
-//            // promotion
-//            for (int k = 0; k < 4; k++) {
-//              // one square
-//              if (position.board[i + multiplier][j].color == ' ') {
-//                new_position = base_position.CreateDeepCopy();
-//                new_position->board[i + multiplier][j].color =
-//                    new_position->board[i][j].color;
-//                new_position->board[i + multiplier][j].type =
-//                    promotion_pieces[k];
-//                new_position->board[i][j].empty();
-//                if (!InCheck(*new_position, position.to_move) &&
-//                    !board_exists(position, *new_position)) {
-//                  position.outcomes->emplace_back(new_position);
-//                } else {
-//                  delete new_position;
-//                }
-//              }
-//              // captures to the left
-//              if (left_capture) {
-//                new_position = base_position.CreateDeepCopy();
-//                new_position->board[i + multiplier][j - 1].color =
-//                    new_position->board[i][j].color;
-//                new_position->board[i + multiplier][j - 1].type =
-//                    promotion_pieces[k];
-//                new_position->board[i][j].empty();
-//                if (!InCheck(*new_position, position.to_move) &&
-//                    !board_exists(position, *new_position)) {
-//                  position.outcomes->emplace_back(new_position);
-//                } else {
-//                  delete new_position;
-//                }
-//              }
-//              // captures to the right
-//              if (right_capture) {
-//                new_position = base_position.CreateDeepCopy();
-//                new_position->board[i + multiplier][j + 1].color =
-//                    new_position->board[i][j].color;
-//                new_position->board[i + multiplier][j + 1].type =
-//                    promotion_pieces[k];
-//                new_position->board[i][j].empty();
-//                if (!InCheck(*new_position, position.to_move) &&
-//                    !board_exists(position, *new_position)) {
-//                  position.outcomes->emplace_back(new_position);
-//                } else {
-//                  delete new_position;
-//                }
-//              }
-//            }
-//          } else {
-//            if (position.board[i + multiplier][j].color == ' ') {
-//              // one square forward
-//              new_position = base_position.CreateDeepCopy();
-//              new_position->board[i + multiplier][j] =
-//                  new_position->board[i][j];
-//              new_position->board[i][j].empty();
-//              if (!InCheck(*new_position, position.to_move) &&
-//                  !board_exists(position, *new_position)) {
-//                position.outcomes->emplace_back(new_position);
-//              } else {
-//                delete new_position;
-//              }
-//              // two squares forward
-//              if (i == starting_row &&
-//                  position.board[i + multiplier * 2][j].color == ' ') {
-//                new_position = base_position.CreateDeepCopy();
-//                new_position->board[i + (multiplier * 2)][j] =
-//                    new_position->board[i][j];
-//                new_position->board[i][j].empty();
-//                if (!InCheck(*new_position, position.to_move) &&
-//                    !board_exists(position, *new_position)) {
-//                  position.outcomes->emplace_back(new_position);
-//                } else {
-//                  delete new_position;
-//                }
-//              }
-//            }
-//            // captures to the left
-//            if (left_capture) {
-//              new_position = base_position.CreateDeepCopy();
-//              new_position->board[i + multiplier][j - 1] =
-//                  new_position->board[i][j];
-//              new_position->board[i][j].empty();
-//              if (!InCheck(*new_position, position.to_move) &&
-//                  !board_exists(position, *new_position)) {
-//                position.outcomes->emplace_back(new_position);
-//              } else {
-//                delete new_position;
-//              }
-//            }
-//            // captures to the right
-//            if (j < 7 &&
-//                position.board[i + multiplier][j + 1].color == opponent) {
-//              new_position = base_position.CreateDeepCopy();
-//              new_position->board[i + multiplier][j + 1] =
-//                  new_position->board[i][j];
-//              new_position->board[i][j].empty();
-//              if (!InCheck(*new_position, position.to_move) &&
-//                  !board_exists(position, *new_position)) {
-//                position.outcomes->emplace_back(new_position);
-//              } else {
-//                delete new_position;
-//              }
-//            }
-//            // en passant to the left
-//            int en_passant_start = (int)(3.5 + (0.5 * multiplier));
-//            if (i == en_passant_start && j > 0 &&
-//                position.board[i][j - 1].color == opponent &&
-//                position.board[i][j - 1].type == 'P' &&
-//                position.board[i + multiplier][j - 1].color == ' ' &&
-//                position.board[promotion_row][j - 1].color == ' ' &&
-//                position.previous_move &&
-//                position.previous_move->board[promotion_row][j - 1].color ==
-//                    opponent &&
-//                position.previous_move->board[promotion_row][j - 1].type ==
-//                    'P') {
-//              new_position = base_position.CreateDeepCopy();
-//              new_position->board[promotion_row - multiplier][j - 1] =
-//                  new_position->board[i][j];
-//              new_position->board[i][j].empty();
-//              new_position->board[i][j - 1].empty();
-//              if (!InCheck(*new_position, position.to_move) &&
-//                  !board_exists(position, *new_position)) {
-//                position.outcomes->emplace_back(new_position);
-//              } else {
-//                delete new_position;
-//              }
-//            }
-//            // en passant to the right
-//            if (i == en_passant_start && j < 7 &&
-//                position.board[i][j + 1].color == opponent &&
-//                position.board[i][j + 1].type == 'P' &&
-//                position.board[i + multiplier][j + 1].color == ' ' &&
-//                position.board[promotion_row][j + 1].color == ' ' &&
-//                position.previous_move &&
-//                position.previous_move->board[promotion_row][j + 1].color ==
-//                    opponent &&
-//                position.previous_move->board[promotion_row][j + 1].type ==
-//                    'P') {
-//              new_position = base_position.CreateDeepCopy();
-//              new_position->board[i + multiplier][j + 1] =
-//                  new_position->board[i][j];
-//              new_position->board[i][j].empty();
-//              new_position->board[i][j + 1].color =
-//                  new_position->board[i][j + 1].type = ' ';
-//              if (!InCheck(*new_position, position.to_move) &&
-//                  !board_exists(position, *new_position)) {
-//                position.outcomes->emplace_back(new_position);
-//              } else {
-//                delete new_position;
-//              }
-//            }
-//          }
-//          
-//          break;
-//        }
-//        case 'N':
-//          for (int k = 0; k < 8; k++) {
-//            new_i = i + knight_moves[k][0];
-//            new_j = j + knight_moves[k][1];
-//            if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
-//                position.board[new_i][new_j].color != position.to_move) {
-//              new_position = base_position.CreateDeepCopy();
-//              new_position->board[new_i][new_j] = position.board[i][j];
-//              new_position->board[i][j].empty();
-//              if (!InCheck(*new_position, position.to_move) &&
-//                  !board_exists(position, *new_position)) {
-//                position.outcomes->emplace_back(new_position);
-//              } else {
-//                delete new_position;
-//              }
-//            }
-//          }
-//          break;
-//        case 'Q':
-//        case 'B':
-//          for (int k = 0; k < 4; k++) {
-//            new_i = i + bishop_moves[k][0];
-//            new_j = j + bishop_moves[k][1];
-//
-//            while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-//              if (position.board[new_i][new_j].color == position.to_move) {
-//                break;
-//              }
-//              new_position = base_position.CreateDeepCopy();
-//              new_position->board[new_i][new_j] = position.board[i][j];
-//              new_position->board[i][j].empty();
-//              if (!InCheck(*new_position, position.to_move) &&
-//                  !board_exists(position, *new_position)) {
-//                position.outcomes->emplace_back(new_position);
-//              } else {
-//                delete new_position;
-//              }
-//              if (position.board[new_i][new_j].color == opponent) {
-//                break;
-//              }
-//              new_i += bishop_moves[k][0];
-//              new_j += bishop_moves[k][1];
-//            }
-//          }
-//          if (position.board[i][j].type == 'B') {
-//            break;
-//          }
-//        case 'R':
-//          for (int k = 0; k < 4; k++) {
-//            new_i = i + rook_moves[k][0];
-//            new_j = j + rook_moves[k][1];
-//            while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-//              if (position.board[new_i][new_j].color == position.to_move) {
-//                break;
-//              }
-//              new_position = base_position.CreateDeepCopy();
-//              new_position->board[new_i][new_j] = position.board[i][j];
-//              new_position->board[i][j].empty();
-//              if (!InCheck(*new_position, position.to_move) &&
-//                  !board_exists(position, *new_position)) {
-//                if (position.board[7][7] == "WR" &&
-//                    new_position->board[7][7] == "  ") {
-//                  new_position->castling.white_o_o = false;
-//                } else if (position.board[7][0] == "WR" &&
-//                           new_position->board[7][0] == "  ") {
-//                  new_position->castling.white_o_o_o = false;
-//                } else if (position.board[0][7] == "BR" &&
-//                           new_position->board[0][7] == "  ") {
-//                  new_position->castling.black_o_o = false;
-//                } else if (position.board[0][0] == "WR" &&
-//                           new_position->board[0][0] == "  ") {
-//                  new_position->castling.black_o_o_o = false;
-//                }
-//
-//                position.outcomes->emplace_back(new_position);
-//              } else {
-//                delete new_position;
-//              }
-//              if (position.board[new_i][new_j].color == opponent) {
-//                break;
-//              }
-//              new_i = new_i + rook_moves[k][0];
-//              new_j = new_j + rook_moves[k][1];
-//            }
-//          }
-//          break;
-//        case 'K':
-//          for (int k = 0; k < 8; k++) {
-//            new_i = i + king_moves[k][0];
-//            new_j = j + king_moves[k][1];
-//            if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
-//                position.board[new_i][new_j].color != position.to_move) {
-//              new_position = base_position.CreateDeepCopy();
-//              new_position->board[new_i][new_j] = position.board[i][j];
-//              new_position->board[i][j].empty();
-//              new_position->kings[position.to_move] = {new_i, new_j};
-//              if (!InCheck(*new_position, position.to_move) &&
-//                  !board_exists(position, *new_position)) {
-//                if (position.to_move == 'W') {
-//                  new_position->castling.white_o_o =
-//                      new_position->castling.white_o_o_o = false;
-//                } else {
-//                  new_position->castling.black_o_o =
-//                      new_position->castling.black_o_o_o = false;
-//                }
-//                position.outcomes->emplace_back(new_position);
-//              } else {
-//                delete new_position;
-//              }
-//            }
-//          }
-//          if ((position.to_move == 'W'
-//                  ? position.castling.white_o_o
-//                  : position.castling.black_o_o) &&
-//              position.board[i][j + 1].color == ' ' &&
-//              position.board[i][j + 2].color == ' ' &&
-//              !InCheck(position, position.to_move) &&
-//              !InCheck(position, position.to_move, i, j + 1) &&
-//              !InCheck(position, position.to_move, i, j + 2)) {
-//            new_position = base_position.CreateDeepCopy();
-//            new_position->board[i][6].set(position.to_move, 'K');
-//            new_position->board[i][5].set(position.to_move, 'R');
-//            new_position->kings[position.to_move] = {i, 6};
-//            new_position->board[i][4].empty();
-//            new_position->board[i][7].empty();
-//            if (position.to_move == 'W') {
-//              new_position->castling.white_o_o = new_position->castling.white_o_o_o = false;
-//            } else {
-//              new_position->castling.black_o_o = new_position->castling.black_o_o_o = false;
-//            }
-//            if (!board_exists(position, *new_position)) {
-//              position.outcomes->emplace_back(new_position);
-//            } else {
-//              delete new_position;
-//            }
-//          }
-//          if ((position.to_move == 'W'
-//                  ? position.castling.white_o_o_o
-//                  : position.castling.black_o_o_o) &&
-//              position.board[i][j - 1].color == ' ' &&
-//              position.board[i][j - 2].color == ' ' &&
-//              position.board[i][j - 3].color == ' ' &&
-//              !InCheck(position, position.to_move) &&
-//              !InCheck(position, position.to_move, i, j - 1) &&
-//              !InCheck(position, position.to_move, i, j - 2)) {
-//            new_position = base_position.CreateDeepCopy();
-//            new_position->board[i][2].set(position.to_move, 'K');
-//            new_position->board[i][3].set(position.to_move, 'R');
-//            new_position->board[i][4].empty();
-//            new_position->board[i][0].empty();
-//            new_position->kings[position.to_move] = {i, 2};
-//            if (position.to_move == 'W') {
-//              new_position->castling.white_o_o =
-//                  new_position->castling.white_o_o_o = false;
-//            } else {
-//              new_position->castling.black_o_o =
-//                  new_position->castling.black_o_o_o = false;
-//            }
-//            if (!board_exists(position, *new_position)) {
-//              position.outcomes->emplace_back(new_position);
-//            } else {
-//              delete new_position;
-//            }
-//          }
-//
-//          break;
-//      }
-//    }
-//  }
-//  /*if (position.outcomes->size() == 0) {
-//    delete position.outcomes;
-//    position.outcomes = nullptr;
-//  }*/
-//  // for (int i = 0; i < moves.size(); i++) {
-//  //     for (int j = 0; j < 8; j++) {
-//  //         for (int k = 0; k < 8; k++) {
-//  //             std::cout << moves[i].first[j][k];
-//  //         }
-//  //         std::cout << std::endl;
-//  //     }
-//  // }
-//  // return;
-//}
-//
 
 
 
@@ -2455,14 +1979,27 @@ std::string MakeString(const Position& position, const bool& chess_notation, con
       result << "    7    6    5    4    3    2    1    0   \n";
     }
   }
-  for (int i = 7; i >= 0; i--) {
-    result << "  +----+----+----+----+----+----+----+----+\n"
-           << (chess_notation ? (8 - i) : i) << " |";
-    for (int j = 7; j >= 0; j--) {
-      result << ' ' << position.board[i][j].color << position.board[i][j].type
-             << " |";
+  if (white_on_bottom) {
+    for (int i = 0; i <= 7; i++) {
+      result << "  +----+----+----+----+----+----+----+----+\n"
+             << (chess_notation ? (8 - i) : i) << " |";
+      for (int j = 0; j <= 7; j++) {
+        result << ' ' << position.board[i][j].color << position.board[i][j].type
+               << " |";
+      }
+      result << '\n';
     }
-    result << '\n';
+  }
+  else {
+    for (int i = 7; i >= 0; i--) {
+      result << "  +----+----+----+----+----+----+----+----+\n"
+             << (chess_notation ? (8 - i) : i) << " |";
+      for (int j = 7; j >= 0; j--) {
+        result << ' ' << position.board[i][j].color << position.board[i][j].type
+               << " |";
+      }
+      result << '\n';
+    }
   }
   result << "  +----+----+----+----+----+----+----+----+";
   if (chess_notation) {
@@ -2613,7 +2150,23 @@ bool LessOutcome(const Position* position1, const Position* position2) {
   //}
   //return false;
 }
-
+int EvaluateMaterial(const Position& position) {
+  int material = 0;
+  for (size_t i = 0; i < 8; i++) {
+    for (size_t j = 0; j < 8; j++) {
+      if (position.board[i][j].color == ' ' ||
+          position.board[i][j].type == 'K') {
+        continue;
+      }
+      if (position.board[i][j].color == 'W') {
+        material += piece_values[position.board[i][j].type];
+      } else {
+        material -= piece_values[position.board[i][j].type];
+      }
+    }
+  }
+  return material;
+}
 
 bool ComplicatedLessOutcome(const Position* position1,
                             const Position* position2) {
@@ -2677,9 +2230,18 @@ int min_depth = 4;  // no less than 2
 const uint64_t max_bytes = (1 << 30) * (uint64_t)15;
 //const int deepening_depth = 2;
 
+//int reasonability_limit = 8;
+
+
 void minimax(Position& position, int depth, double alpha, double beta,
-             bool* stop/*, bool selective_deepening*/) {
-  if (*stop || position.depth >= depth/* && !selective_deepening)*/) {
+             bool* stop/*, bool reasonable_extension*//*, bool selective_deepening*//*, int initial_material*/) {
+  if (*stop || position.depth >= depth /* && !selective_deepening)*/) {
+     //if (position.outcomes) {
+     //  Position* best_move = GetBestMove(&position);
+     //  if (!best_move) {
+     //    int hi = 2;
+     //  }
+     //}
      return;
   }
   if (position.fifty_move_rule >= 6) {
@@ -2694,6 +2256,12 @@ void minimax(Position& position, int depth, double alpha, double beta,
          if (occurrences == 3) {
           position.evaluation = 0.0;
           position.depth = 0;
+          //if (position.outcomes) {
+          //  Position* best_move = GetBestMove(&position);
+          //  if (!best_move) {
+          //    int hi = 2;
+          //  }
+          //}
           return;
          }
        }
@@ -2701,35 +2269,87 @@ void minimax(Position& position, int depth, double alpha, double beta,
   
   }
 
-  if (depth <= 0/* && !selective_deepening*/) {
-     // if (!position.was_capture || depth < max_depth_extension) {
-     position.evaluation = round(position.evaluation);
-     position.evaluation += EvaluateMobility(position);
-     position.depth = 0;
-     return/* false*/;
-     //}
-  }
-
   if (!position.outcomes) {
-     
-     new_generate_moves(position);
+    new_generate_moves(position);
   }
 
   if (position.outcomes->size() == 0) {
-     if (InCheck(position, position.to_move)) {
+    position.depth = depth;
+    if (InCheck(position, position.to_move)) {
        position.evaluation =
-           position.white_to_move ? (double)-mate + (double)position.number
-                         : (double)mate - (double)position.number;  // checkmate
-     } else {
+           position.white_to_move
+               ? (double)-mate + (double)position.number
+               : (double)mate - (double)position.number;  // checkmate
+    } else {
        position.evaluation = 0;  // draw by stalemate
-     }
-     return;
+    }
+    return;
   }
-  if (position.fifty_move_rule >= 100) { // fifty move rule
-     position.evaluation = 0;
-     return;
+  if (position.fifty_move_rule >= 100) {  // fifty move rule
+    position.evaluation = 0;
+    //if (position.outcomes) {
+    //   Position* best_move = GetBestMove(&position);
+    //   if (!best_move) {
+    //     int hi = 2;
+    //   }
+    //}
+    return;
   }
-  if (depth >= min_depth) {
+  if (depth <= 0) {
+    if ((*position.outcomes)[0]->outcomes) {
+       depth = 1;
+    } else {
+       position.evaluation = position.evaluation + EvaluateMobility(position);
+       if (position.white_to_move
+               ? position.evaluation >= beta
+                                  : position.evaluation <= alpha) {
+         return;
+       }
+    }
+    
+    /* else if (std::none_of(position.outcomes->begin(),
+                                   position.outcomes->end(),
+                                   [&position](Position* o) {
+                                     return round(o->evaluation != position.evaluation;
+                                   })) {
+       depth = 1;
+        
+    } else {
+       position.evaluation = round(position.evaluation);
+       position.evaluation += EvaluateMobility(position);
+       position.depth = 0;
+       return;
+    }*/
+    //if (position.outcomes) {
+    //   depth = 1;
+    //} else if (position.depth == -1) {
+    //   position.evaluation = round(position.evaluation);
+    //   position.evaluation += EvaluateMobility(position);
+    //   position.depth = 0;
+    //   if (position.outcomes) {
+    //     for (int a = 0; a < position.outcomes->size(); a++) {
+    //      if ((*position.outcomes)[a]->evaluation == position.evaluation) {
+    //        return;
+    //      }
+    //     }
+    //     int b = 765;
+    //   }
+    //   return;
+    //} else if (position.depth == 0) {
+    //   //assert(position.depth == 0);
+    //   return;
+    //}
+      /*else if (position.outcomes) {
+       for (int a = 0; a < position.outcomes->size(); a++) {
+         if ((*position.outcomes)[a]->evaluation == position.evaluation) {
+          return;
+         }
+       }
+       int b = 765;
+    }*/
+  }
+
+  if (depth >= (min_depth - 1)) {
      PROCESS_MEMORY_COUNTERS_EX pmc{};
      GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc,
                           sizeof(pmc));
@@ -2737,15 +2357,27 @@ void minimax(Position& position, int depth, double alpha, double beta,
        *stop = true;
      }
   }
+  if (position.outcomes->size() <= 3) {
+     depth++;
+  }
+  //if (position.depth > 0) {
   std::sort(position.outcomes->begin(), position.outcomes->end(),
                position.white_to_move ? GreaterOutcome : LessOutcome);
+  //}
   double position_material = round(position.evaluation);
   //double initial_evaluation = (*position.outcomes)[0]->evaluation;
-  double best_potential = (*position.outcomes)[0]->evaluation;
+  //double best_potential = (*position.outcomes)[0]->evaluation;
   //if (position.evaluation != (*position.outcomes)[0]->evaluation) {
   //   int h = 2;
   //}
   //int multiplier = initial_evaluation > 0 ? -1 : 1;
+  double initial_evaluation;
+  if (depth <= 0) {
+     assert((EvaluateMaterial(position) + EvaluateMobility(position)) ==
+            position.evaluation);
+     initial_evaluation = position.evaluation;
+  }
+
   position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
 
 
@@ -2753,34 +2385,41 @@ void minimax(Position& position, int depth, double alpha, double beta,
   /*std::sort(position.outcomes->begin(),
             position.outcomes->end(),
             position.white_to_move ? GreaterOutcome : LessOutcome);*/
-  //std::cout << time(NULL) - s;
+  // std::cout << time(NULL) - s;
   int c = 0;
-  for (;
-       c < position.outcomes
-               ->size() /* && (selective_deepening ? (abs(initial_evaluation -
-                           (*position.outcomes)[c]->evaluation) < 3) : true)*/
-       ;
-       c++) {
+  for (; c < position.outcomes->size(); c++) {
      // if (depth == original_depth) {
      //   output.possibilities[possible_moves[c]] = position_value.evaluation;
      // }
-     if (position.to_move == 'W') {
-       if (position.outcomes->size() <= 2) {
-         minimax(*(*position.outcomes)[c], depth, alpha, beta, stop/*,
-               selective_deepening*/);
-       } else if (round((*position.outcomes)[c]->evaluation) >= position_material + 1) {
-         minimax(*(*position.outcomes)[c], depth, alpha, beta, stop/*,
-               selective_deepening*/);
-       } else if (round((*position.outcomes)[c]->evaluation) <= position_material - 1) {
-         minimax(*(*position.outcomes)[c], depth - 2, alpha, beta, stop/*,
-               selective_deepening*/);
+     //if (depth == 1 &&
+     //    round((*position.outcomes)[c]->evaluation) != position_material &&
+     //    (!reasonable_extension ||
+     //     ((initial_material - round((*position.outcomes)[c]->evaluation) <=
+     //       reasonability_limit) &&
+     //      (initial_material - round((*position.outcomes)[c]->evaluation) >=
+     //       -reasonability_limit)))) {
+     //  minimax(*(*position.outcomes)[c], depth, alpha, beta, stop,
+     //          reasonable_extension, initial_material);
+
+     //} else {
+     if (depth <= 0) {
+       if (round((*position.outcomes)[c]->evaluation) == position_material) {
+         if (initial_evaluation > position.evaluation) {
+          position.evaluation = initial_evaluation;
+         }
        } else {
-         minimax(*(*position.outcomes)[c], depth - 1, alpha, beta, stop/*,
-               selective_deepening*/);
+         minimax(*(*position.outcomes)[c], depth, alpha, beta, stop/*,
+                 reasonable_extension *//*, initial_material*/);
        }
-       /*if (position_value.evaluation > mate) {
-           position_value.evaluation--;
-       }*/
+     } else {
+       minimax(*(*position.outcomes)[c], depth - 1, alpha, beta, stop/*,
+               reasonable_extension *//*, initial_material*/);
+     }
+     //}
+    
+     if (position.to_move == 'W') {
+
+
 
        if ((*position.outcomes)[c]->evaluation > position.evaluation) {
          position.evaluation = (*position.outcomes)[c]->evaluation;
@@ -2791,22 +2430,6 @@ void minimax(Position& position, int depth, double alpha, double beta,
          alpha = (*position.outcomes)[c]->evaluation;
        }
      } else {
-       /*if (position_value.evaluation < -mate) {
-           position_value.evaluation++;
-       }*/
-       if (position.outcomes->size() <= 2) {
-         minimax(*(*position.outcomes)[c], depth, alpha, beta, stop/*,
-               selective_deepening*/);
-       } else if (round((*position.outcomes)[c]->evaluation) <= position_material - 1) {
-         minimax(*(*position.outcomes)[c], depth, alpha, beta, stop/*,
-               selective_deepening*/);
-       } else if (round((*position.outcomes)[c]->evaluation) >= position_material + 1) {
-         minimax(*(*position.outcomes)[c], depth - 2, alpha, beta, stop/*,
-               selective_deepening*/);
-       } else {
-         minimax(*(*position.outcomes)[c], depth - 1, alpha, beta, stop/*,
-               selective_deepening*/);
-       }
        if (/*position.evaluation == INT_MAX || LessOutcome(*/ (
                *position.outcomes)[c]
                ->evaluation < position.evaluation) {
@@ -2827,12 +2450,27 @@ void minimax(Position& position, int depth, double alpha, double beta,
        break;
      }
   }
+
+  //if (depth <= 0) {
+  //   if ((position.white_to_move ? (round(position.evaluation) > position_material) : (round(position.evaluation) < position_material)) && position.evaluation != (position.white_to_move ? INT_MIN : INT_MAX)) {
+  //     position.depth = 0;
+  //     return;
+  //   }
+  //   position.evaluation = position_material;
+  //   position.evaluation += EvaluateMobility(position);
+  //   position.depth = 0;
+  //   return;
+  //}
+  /*Position* best_move = GetBestMove(&position);
+  if (!best_move) {
+     int hi = 2;
+  }*/
   if (!*stop && c == position.outcomes->size()) {
-    if (depth <= 0) {
+ /*   if (depth <= 0) {
       position.depth = 1;
-    } else {
+    } else {*/
       position.depth = depth;
-    }
+    //}
   }
   //Position* best_move = GetBestMove(&position);
   //assert(best_move->evaluation == position.evaluation);
@@ -2923,12 +2561,15 @@ std::mutex stop_mutex;
 
 std::vector<Position*> GetLine(Position* position) {
   std::vector<Position*> line;
-  while (position->outcomes) {
+  //line.emplace_back(position);
+  while (position->outcomes && GetBestMove(position)) {
     position = GetBestMove(position);
     line.emplace_back(position);
   }
   return line;
 }
+
+const double aspiration_window = 0.25;
 
 void calculate_moves(void* varg) {
   //double minimum_time = 3;
@@ -2959,25 +2600,64 @@ void calculate_moves(void* varg) {
 
       if (input->position->to_move == input->side) {
         //printf("[calculate_moves] minimax start");
+        //if (input->position->depth >= min_depth) {
+        //  minimax(*input->position, min_depth, INT_MIN,
+        //          INT_MAX, input->stop, true,
+        //          (int)round(EvaluateMaterial(*input->position)));
+
+        //}
+         double alpha, beta;
+         double alpha_aspiration_window = aspiration_window;
+         double beta_aspiration_window = aspiration_window;
+         double approximate_evaluation = input->position->evaluation;
         while (input->position->depth < min_depth && !*input->stop) {
-          minimax(*input->position, input->position->depth + 1, INT_MIN, INT_MAX, input->stop);
+          if (input->position->depth > 2) {
+            alpha = input->position->evaluation - aspiration_window;
+            beta = input->position->evaluation + aspiration_window;
+          } else {
+            alpha = INT_MIN;
+            beta = INT_MAX;
+          }
+          minimax(*input->position, input->position->depth + 1, alpha, beta, input->stop/*, true, EvaluateMaterial(*input->position)*/);
+          if (input->position->evaluation <= alpha) {
+            alpha_aspiration_window *= 4;
+          } else if (input->position->evaluation >= beta) {
+            beta_aspiration_window *= 4;
+          } else {
+            alpha_aspiration_window = beta_aspiration_window =
+                aspiration_window;
+            approximate_evaluation = input->position->evaluation;
+          }
         }
+        //if (abs(EvaluateMaterial(*input->position) - (int)
+        //        round(input->position->evaluation)) > reasonability_limit) {
+        //  minimax(*input->position, input->position->depth, INT_MIN, INT_MAX,
+        //          input->stop/*, false, (int) round(input->position->evaluation)*/);
+        //}
         done = true;
         *input->stop = true;
         done_cv.notify_one();
 
       } else {
-        PROCESS_MEMORY_COUNTERS_EX pmc{};
-        GetProcessMemoryInfo(GetCurrentProcess(),
-                             (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
-        while (!*input->stop && (deleting != 0 || pmc.WorkingSetSize < max_bytes)) {
-          minimax(*input->position,
-                  input->position->depth + 1,
-                  INT_MIN, INT_MAX, input->stop);
-          GetProcessMemoryInfo(GetCurrentProcess(),
-                               (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+        //PROCESS_MEMORY_COUNTERS_EX pmc{};
+        //GetProcessMemoryInfo(GetCurrentProcess(),
+        //                     (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+        while (!*input->stop/* && (deleting != 0 || pmc.WorkingSetSize < max_bytes)*/) {
+          for (int i = 0;
+               i < input->position->outcomes->size() && !*input->stop; i++) {
+            minimax(*(*input->position->outcomes)[i],
+                    std::max(min_depth, (*input->position->outcomes)[i]->depth + 1),
+                    INT_MIN, INT_MAX, input->stop/*, true,
+                    (int)round(EvaluateMaterial(*input->position))*/);
+          }
+          /*minimax(*input->position,
+                  std::max(min_depth + 1, input->position->depth + 1), INT_MIN,
+                  INT_MAX, input->stop, true,
+                  (int) round(EvaluateMaterial(*input->position)));*/
+          //GetProcessMemoryInfo(GetCurrentProcess(),
+          //                     (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
         }
-        *input->stop = true;
+        //*input->stop = true;
       }
 
     }
@@ -2991,8 +2671,8 @@ void calculate_moves(void* varg) {
       }
       if (input->position->to_move ==
                   input->side && /*(input->position->depth >= min_depth ||*/
-              input->position->outcomes->size() == 1 ||
-          input->position->outcomes->size() == 0 /*)*/) {
+              input->position->outcomes->size() == 1/*)*/) {
+        input->position->evaluation = (*input->position->outcomes)[0]->evaluation;
         done = true;
         *input->stop = true;
         done_cv.notify_one();
@@ -3040,10 +2720,10 @@ void calculate_moves(void* varg) {
 int CheckGameOver(Position* position) {
   if (position->outcomes->size() == 0) {
     if (position->white_to_move && InCheck(*position, 'W')) {
-      return 1;
+      return -1;
     }
     if (!position->white_to_move && InCheck(*position, 'B')) {
-      return -1;
+      return 1;
     }
     return 0;
   }
@@ -3347,9 +3027,9 @@ Position* ReadPGN(Position* position) {
               position->board[i][j].color = 'W';
             }
             position->board[i][j].type = toupper(elements[0][k]);
+            j++;
           }
 
-          j++;
         }
         position->to_move = toupper(elements[1][0]);
         if (elements[2][0] == 'K') {
@@ -3399,80 +3079,6 @@ Position* ReadPGN(Position* position) {
   }
   position->number = position_number;
   position->depth = 0;
-
-  //getline(file, line);
-  //int i = 0;
-  //while (i < line.length() - 4) {
-  //  i += 3;
-  //  std::string m;
-  //  m += line[i];
-  //  i++;
-  //  m += line[i];
-  //  new_generate_moves(*position);
-  //  position = GetPosition(*position, m);
-  //  i++;
-  //  m = "";
-  //  m += line[i];
-  //  i++;
-  //  m += line[i];
-  //  new_generate_moves(*position);
-  //  position = GetPosition(*position, m);
-  //}
-
-  
-
-
-  //int brackets = 0;
-  //char c;
-  //do {
-  //  file.read(&c, sizeof(c));
-  //  if (c == '[') {
-  //    brackets++;
-  //    std::string id = ""; // read until a whitespace
-  //    switch (id) { case "FEN":
-
-  //    }
-  //  } else if (c == ']') {
-  //    brackets--;
-  //  }
-  //} while (brackets != 0 || c == ']');
-
-  //for (int i = 0; i < 8; i++) {
-  //  file.ignore(4);
-  //  for (int j = 0; j < 8; j++) {
-  //    char piece[5];
-  //    file.read(piece, sizeof(piece));
-  //    position.board[i][j].color = piece[0];
-  //    position.board[i][j].type = piece[1];
-  //  }
-  //  // skip newline
-  //  file.ignore(44);
-  //}
-
-  //char castle;
-  //file.read(&castle, sizeof(castle));
-  //position.castling.white_o_o = castle == '1';
-  //file.read(&castle, sizeof(castle));
-  //position.castling.white_o_o_o = castle == '1';
-  //file.read(&castle, sizeof(castle));
-  //position.castling.black_o_o = castle == '1';
-  //file.read(&castle, sizeof(castle));
-  //position.castling.black_o_o_o = castle == '1';
-
-  //file.ignore(1);
-  //char to_move[1];
-  //file.read(to_move, sizeof(to_move));
-  //position.to_move = to_move[0];
-  //position.white_to_move = position.to_move == 'W';
-  //for (int i = 0; i < 8; i++) {
-  //  for (int j = 0; j < 8; j++) {
-  //    if (position.board[i][j].type == 'K') {
-  //      position.kings[position.board[i][j].color].row = i;
-  //      position.kings[position.board[i][j].color].column = j;
-  //      break;
-  //    }
-  //  }
-  //}
   file.close();
   return position;
 }
@@ -3685,23 +3291,7 @@ std::string ToLower(std::string input) {
   return output;
 }
 
-int EvaluateMaterial(const Position& position) {
-  int material = 0;
-  for (size_t i = 0; i < 8; i++) {
-    for (size_t j = 0; j < 8; j++) {
-      if (position.board[i][j].color == ' ' ||
-          position.board[i][j].type == 'K') {
-        continue;
-      }
-      if (position.board[i][j].color == 'W') {
-        material += piece_values[position.board[i][j].type];
-      } else {
-        material -= piece_values[position.board[i][j].type];
-      }
-    }
-  }
-  return material;
-}
+
 
 int CountMaterial(const Position& position) {
   int count = 0;
@@ -3765,7 +3355,76 @@ int main() {
     board.emplace_back(row);
   }
   int max_positions = 2500000;
+  //while (true) {
+  //  Position* position = Position::StartingPosition();
+  //  std::string fen;
+  //  std::cout << "FEN: ";
+  //  std::getline(std::cin, fen);
+  //  std::stringstream elements_line(fen);
+  //  std::vector<std::string> elements;
+  //  for (int i = 0; i < 6; i++) {
+  //    std::string s;
+  //    elements_line >> s;
+  //    elements.push_back(s);
+  //  }
+  //  int i = 0;
+  //  int j = 0;
+  //  for (int k = 0; k < elements[0].length(); k++) {
+  //    if (elements[0][k] == '/') {
+  //      i++;
+  //      j = 0;
+  //      continue;
+  //    }
+  //    if (i < 0 || i > 7 || j < 0 || j > 7) {
+  //      std::cout << "FEN error";
+  //      exit(1);
+  //    }
+  //    if (isdigit(elements[0][k])) {
+  //      for (int l = char_to_int(elements[0][k]); l > 0; l--) {
+  //        if (j > 7) {
+  //          std::cout << "FEN error";
+  //          exit(1);
+  //        }
+  //        position->board[i][j].empty();
+  //        j++;
+  //      }
+  //    } else {
+  //      if (islower(elements[0][k])) {
+  //        position->board[i][j].color = 'B';
+  //      } else {
+  //        position->board[i][j].color = 'W';
+  //      }
+  //      position->board[i][j].type = toupper(elements[0][k]);
+  //      j++;
 
+  //    }
+
+  //  }
+  //  position->to_move = toupper(elements[1][0]);
+  //  if (elements[2][0] == 'K') {
+  //    position->castling.white_o_o = true;
+  //  }
+  //  if (elements[2][0] == 'Q') {
+  //    position->castling.white_o_o_o = true;
+  //  }
+  //  if (elements[2][0] == 'k') {
+  //    position->castling.black_o_o = true;
+  //  }
+  //  if (elements[2][0] == 'q') {
+  //    position->castling.black_o_o_o = true;
+  //  }
+  //  if (elements[3] != "-") {
+  //    position->en_passant_target.row = elements[3][0] - 'a';
+  //    position->en_passant_target.column = char_to_int(elements[3][1]);
+  //  } else {
+  //    position->en_passant_target.clear();
+  //  }
+  //  position->fifty_move_rule = stoi(elements[4]);
+
+  //  std::cout << "Evaluation: "
+  //            << EvaluateMaterial(*position) + EvaluateMobility(*position) << std::endl;
+  //}
+  //
   //int rounding = 1e7;
   bool white_O_O = true;
   bool white_O_O_O = true;
@@ -3848,7 +3507,7 @@ int main() {
   if (color == position->to_move) {
     //std::cout << "My move: ";
     min_depth = (int)std::max(
-        4.0, floor(log2(max_positions) / log2(CountMaterial(*position) / 2.0)));
+        4.0, round(log2(max_positions) / log2(CountMaterial(*position) / 2.0)));
   } else {
     // minimax(*position, 1, INT_MIN, INT_MAX, info->stop, false); // TODO: delete this line
     new_generate_moves(*position);
@@ -3962,15 +3621,34 @@ ComplicatedLessOutcome);
         if (!mental_chess) { // died with this
           std::cout << MakeString(*best_move, chess_notation, white_on_bottom) << std::endl;
           std::cout << "Material evaluation: " << EvaluateMaterial(*best_move) << std::endl;
-          std::cout << "Evaluation on depth " << best_move->depth
+          std::cout << "Evaluation on depth "
+                    << ((best_move->depth <= 0)
+                            ? "?"
+                            : std::to_string(best_move->depth))
                     << ": " << Convert(best_move->evaluation) << std::endl;
           std::cout << "Line: ";
           std::vector<Position*> line = GetLine(position);
+          std::cout << "[got line] ";
+          if (line.size() == 0) {
+            std::cout << std::endl << "Line was size 0";
+            exit(1);
+          }
           std::cout << GetMove(*position, *line[0], chess_notation);
+          std::cout << "[got first move] ";
           for (size_t i = 1; i < line.size(); i++) {
             std::cout << ' ' << GetMove(*line[i - 1], *line[i], chess_notation);
+            std::cout << "[got next move] ";
           }
-          std::cout << std::endl;
+          std::cout << "[finished line]" << std::endl;
+          //std::cout << "e4 line: "
+          //          << "(" << GetPosition(*position, "e4")->evaluation << " evaluation) "
+          //          << "e4 ";
+          //std::vector<Position*> e_line = GetLine(GetPosition(*position, "e4"));
+          //for (size_t i = 1; i < line.size(); i++) {
+          //  std::cout << ' ' << GetMove(*line[i - 1], *line[i], chess_notation);
+          //  //std::cout << "[got next move] ";
+          //}
+          //std::cout << std::endl;
           std::cout << "Moves: " << best_move->outcomes->size() << std::endl
                     << "Material: " << (float) CountMaterial(*best_move) / 2.0 << std::endl;
         }
@@ -4098,6 +3776,9 @@ ComplicatedLessOutcome);
       //printf("[main thread %d] acquire.\n", GetCurrentThreadId());
       waiting.acquire();
       UpdatePGN(new_position, GetMove(*position, *new_position, true));
+      if (!new_position->outcomes) {
+        new_generate_moves(*new_position);
+      }
 
 
 
@@ -4105,7 +3786,8 @@ ComplicatedLessOutcome);
       if (!mental_chess) {
         std::cout << MakeString(*new_position, chess_notation, white_on_bottom) << std::endl;
         std::cout << "Material evaluation: " << EvaluateMaterial(*new_position) << std::endl;
-        std::cout << "Evaluation on depth " << new_position->depth << ": "
+        std::cout << "Evaluation on depth " << ((new_position->depth <= 0)
+            ? "?" : std::to_string(new_position->depth)) << ": "
                   << Convert(new_position->evaluation) << std::endl;
         std::cout << "Moves: " << new_position->outcomes->size() << std::endl
                   << "Material: " << (float)CountMaterial(*new_position) / 2.0
@@ -4119,7 +3801,7 @@ ComplicatedLessOutcome);
         new_generate_moves(*new_position);
       }
 
-          min_depth = (int) std::max(4.0, floor(log2(max_positions) /
+          min_depth = (int) std::max(4.0, round(log2(max_positions) /
                              log2(CountMaterial(*position) / 2.0)));
       done = false;
       // stop_mutex.lock();
