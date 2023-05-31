@@ -2295,11 +2295,18 @@ void minimax(Position& position, int depth, double alpha, double beta,
     //}
     return;
   }
-  if (depth <= 0) {
+  if (position.outcomes->size() <= 3) {
+    depth++;
+  }
+  if (depth == 0) {
     if ((*position.outcomes)[0]->outcomes) {
        depth = 1;
-    } else {
-       position.evaluation = position.evaluation + EvaluateMobility(position);
+    }
+    else {
+      //if (position.evaluation != round(position.evaluation)) {
+      //   int g = 2;
+      // }
+       position.evaluation = round(position.evaluation) + EvaluateMobility(position);
        if (position.white_to_move
                ? position.evaluation >= beta
                                   : position.evaluation <= alpha) {
@@ -2357,12 +2364,32 @@ void minimax(Position& position, int depth, double alpha, double beta,
        *stop = true;
      }
   }
-  if (position.outcomes->size() <= 3) {
-     depth++;
-  }
+
   //if (position.depth > 0) {
   std::sort(position.outcomes->begin(), position.outcomes->end(),
                position.white_to_move ? GreaterOutcome : LessOutcome);
+  if (depth <= 0) {
+     double d = EvaluateMaterial(position) + EvaluateMobility(position);
+     assert(d == position.evaluation);
+     if (position.outcomes->back()->evaluation == round(position.evaluation)) {
+       if (position.white_to_move) {
+         if (position.outcomes->back()->evaluation > alpha) {
+          alpha = position.outcomes->back()->evaluation;
+         }
+       } else {
+         if (position.outcomes->back()->evaluation < beta) {
+          beta = position.outcomes->back()->evaluation;
+         }
+       }
+       if (beta <= alpha) {
+         return;
+       }
+     } else {
+       position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
+     }
+  } else {
+     position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
+  }
   //}
   double position_material = round(position.evaluation);
   //double initial_evaluation = (*position.outcomes)[0]->evaluation;
@@ -2371,14 +2398,14 @@ void minimax(Position& position, int depth, double alpha, double beta,
   //   int h = 2;
   //}
   //int multiplier = initial_evaluation > 0 ? -1 : 1;
-  double initial_evaluation;
-  if (depth <= 0) {
-     assert((EvaluateMaterial(position) + EvaluateMobility(position)) ==
-            position.evaluation);
-     initial_evaluation = position.evaluation;
-  }
+  //double initial_evaluation;
+  //if (depth <= 0) {
+  //   double d = EvaluateMaterial(position) + EvaluateMobility(position);
+  //   assert(d ==
+  //          position.evaluation);
+  //   initial_evaluation = position.evaluation;
+  //}
 
-  position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
 
 
   // time_t s = time(NULL);
@@ -2404,9 +2431,10 @@ void minimax(Position& position, int depth, double alpha, double beta,
      //} else {
      if (depth <= 0) {
        if (round((*position.outcomes)[c]->evaluation) == position_material) {
-         if (initial_evaluation > position.evaluation) {
-          position.evaluation = initial_evaluation;
-         }
+         continue;
+         //if (initial_evaluation > position.evaluation) {
+         // position.evaluation = initial_evaluation;
+         //}
        } else {
          minimax(*(*position.outcomes)[c], depth, alpha, beta, stop/*,
                  reasonable_extension *//*, initial_material*/);
@@ -2417,7 +2445,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
      }
      //}
     
-     if (position.to_move == 'W') {
+     if (position.white_to_move) {
 
 
 
