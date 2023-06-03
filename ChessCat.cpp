@@ -2298,23 +2298,10 @@ void minimax(Position& position, int depth, double alpha, double beta,
   if (position.outcomes->size() <= 3) {
     depth++;
   }
-  if (depth == 0) {
-    if ((*position.outcomes)[0]->outcomes) {
+  if (depth == 0 && (*position.outcomes)[0]->outcomes) {
        depth = 1;
-    }
-    else {
-      //if (position.evaluation != round(position.evaluation)) {
-      //   int g = 2;
-      // }
-       position.evaluation = round(position.evaluation) + EvaluateMobility(position);
-       if (position.white_to_move
-               ? position.evaluation >= beta
-                                  : position.evaluation <= alpha) {
-         return;
-       }
-    }
-
   }
+  
 
   if (depth >= (min_depth - 1)) {
      PROCESS_MEMORY_COUNTERS_EX pmc{};
@@ -2325,39 +2312,38 @@ void minimax(Position& position, int depth, double alpha, double beta,
      }
   }
 
-  //if (position.depth > 0) {
   std::sort(position.outcomes->begin(), position.outcomes->end(),
-               position.white_to_move ? GreaterOutcome : LessOutcome);
-  if (depth <= 0) {
-     double d = EvaluateMaterial(position) + EvaluateMobility(position);
-     assert(d == position.evaluation);
-     if (position.outcomes->back()->evaluation == round(position.evaluation)) {
-       if (position.white_to_move) {
-         if (position.outcomes->back()->evaluation > alpha) {
-          alpha = position.outcomes->back()->evaluation;
-         }
-       } else {
-         if (position.outcomes->back()->evaluation < beta) {
-          beta = position.outcomes->back()->evaluation;
-         }
-       }
-       if (beta <= alpha) {
-         return;
+            position.white_to_move ? GreaterOutcome : LessOutcome);
+  double initial_evaluation;
+  if (depth == 0 &&
+      position.outcomes->back()->evaluation == position.evaluation) {
+     initial_evaluation = position.evaluation;
+     position.evaluation =
+         round(position.evaluation) + EvaluateMobility(position);
+     if (position.white_to_move) {
+       if (position.evaluation > alpha) {
+         alpha = position.evaluation;
        }
      } else {
-       position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
+       if (position.evaluation < beta) {
+         beta = position.evaluation;
+       }
      }
+     if (beta <= alpha) {
+       return;
+     }
+
   } else {
-     position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
+     initial_evaluation = position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
   }
-  double position_material = round(position.evaluation);
+  //double position_material = round(position.evaluation);
 
   //int c = 0;
   for (size_t c = 0; c < position.outcomes->size(); c++) {
 
      //} else {
-     if (depth <= 0) {
-       if (round((*position.outcomes)[c]->evaluation) == position_material) {
+     if (depth == 0) {
+       if ((*position.outcomes)[c]->evaluation == initial_evaluation) {
          if (!*stop) {
           position.depth = 0;
          }
@@ -2366,6 +2352,8 @@ void minimax(Position& position, int depth, double alpha, double beta,
          // position.evaluation = initial_evaluation;
          //}
        } else {
+         assert(round(initial_evaluation) !=
+                round((*position.outcomes)[c]->evaluation));
          minimax(*(*position.outcomes)[c], depth, alpha, beta, stop/*,
                  reasonable_extension *//*, initial_material*/);
        }
