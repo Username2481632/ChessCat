@@ -2313,47 +2313,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
          return;
        }
     }
-    
-    /* else if (std::none_of(position.outcomes->begin(),
-                                   position.outcomes->end(),
-                                   [&position](Position* o) {
-                                     return round(o->evaluation != position.evaluation;
-                                   })) {
-       depth = 1;
-        
-    } else {
-       position.evaluation = round(position.evaluation);
-       position.evaluation += EvaluateMobility(position);
-       position.depth = 0;
-       return;
-    }*/
-    //if (position.outcomes) {
-    //   depth = 1;
-    //} else if (position.depth == -1) {
-    //   position.evaluation = round(position.evaluation);
-    //   position.evaluation += EvaluateMobility(position);
-    //   position.depth = 0;
-    //   if (position.outcomes) {
-    //     for (int a = 0; a < position.outcomes->size(); a++) {
-    //      if ((*position.outcomes)[a]->evaluation == position.evaluation) {
-    //        return;
-    //      }
-    //     }
-    //     int b = 765;
-    //   }
-    //   return;
-    //} else if (position.depth == 0) {
-    //   //assert(position.depth == 0);
-    //   return;
-    //}
-      /*else if (position.outcomes) {
-       for (int a = 0; a < position.outcomes->size(); a++) {
-         if ((*position.outcomes)[a]->evaluation == position.evaluation) {
-          return;
-         }
-       }
-       int b = 765;
-    }*/
+
   }
 
   if (depth >= (min_depth - 1)) {
@@ -2390,48 +2350,18 @@ void minimax(Position& position, int depth, double alpha, double beta,
   } else {
      position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
   }
-  //}
   double position_material = round(position.evaluation);
-  //double initial_evaluation = (*position.outcomes)[0]->evaluation;
-  //double best_potential = (*position.outcomes)[0]->evaluation;
-  //if (position.evaluation != (*position.outcomes)[0]->evaluation) {
-  //   int h = 2;
-  //}
-  //int multiplier = initial_evaluation > 0 ? -1 : 1;
-  //double initial_evaluation;
-  //if (depth <= 0) {
-  //   double d = EvaluateMaterial(position) + EvaluateMobility(position);
-  //   assert(d ==
-  //          position.evaluation);
-  //   initial_evaluation = position.evaluation;
-  //}
 
-
-
-  // time_t s = time(NULL);
-  /*std::sort(position.outcomes->begin(),
-            position.outcomes->end(),
-            position.white_to_move ? GreaterOutcome : LessOutcome);*/
-  // std::cout << time(NULL) - s;
-  int c = 0;
-  for (; c < position.outcomes->size(); c++) {
-     // if (depth == original_depth) {
-     //   output.possibilities[possible_moves[c]] = position_value.evaluation;
-     // }
-     //if (depth == 1 &&
-     //    round((*position.outcomes)[c]->evaluation) != position_material &&
-     //    (!reasonable_extension ||
-     //     ((initial_material - round((*position.outcomes)[c]->evaluation) <=
-     //       reasonability_limit) &&
-     //      (initial_material - round((*position.outcomes)[c]->evaluation) >=
-     //       -reasonability_limit)))) {
-     //  minimax(*(*position.outcomes)[c], depth, alpha, beta, stop,
-     //          reasonable_extension, initial_material);
+  //int c = 0;
+  for (size_t c = 0; c < position.outcomes->size(); c++) {
 
      //} else {
      if (depth <= 0) {
        if (round((*position.outcomes)[c]->evaluation) == position_material) {
-         continue;
+         if (!*stop) {
+          position.depth = 0;
+         }
+         return;
          //if (initial_evaluation > position.evaluation) {
          // position.evaluation = initial_evaluation;
          //}
@@ -2462,38 +2392,18 @@ void minimax(Position& position, int depth, double alpha, double beta,
                *position.outcomes)[c]
                ->evaluation < position.evaluation) {
          position.evaluation = (*position.outcomes)[c]->evaluation;
-         // position.best_move = (*position.outcomes)[c];
-         //  output.castling = position_value.castling;
-         //  output.move_history = position_value.move_history;
+
        }
        if ((*position.outcomes)[c]->evaluation < beta) {
          beta = (*position.outcomes)[c]->evaluation;
        }
      }
      if (beta <= alpha) {
-       // for (int j = c + 1; j < position.outcomes->size(); j++) {
-       //   (*position.outcomes)[j]->evaluation = white_to_move ? INT_MIN :
-       //   INT_MAX;
-       // }
-       break;
+
+       return;
      }
   }
-
-  //if (depth <= 0) {
-  //   if ((position.white_to_move ? (round(position.evaluation) > position_material) : (round(position.evaluation) < position_material)) && position.evaluation != (position.white_to_move ? INT_MIN : INT_MAX)) {
-  //     position.depth = 0;
-  //     return;
-  //   }
-  //   position.evaluation = position_material;
-  //   position.evaluation += EvaluateMobility(position);
-  //   position.depth = 0;
-  //   return;
-  //}
-  /*Position* best_move = GetBestMove(&position);
-  if (!best_move) {
-     int hi = 2;
-  }*/
-  if (!*stop && c == position.outcomes->size()) {
+  if (!*stop/* && c == position.outcomes->size()*/) {
  /*   if (depth <= 0) {
       position.depth = 1;
     } else {*/
@@ -2506,20 +2416,6 @@ void minimax(Position& position, int depth, double alpha, double beta,
 }
 
 int thread_count = 0;
-
-
-//void Premoves(void* arg) {
-//  thread_count++;
-//  // std::cout << "Premoves thread starting: " << GetCurrentThreadId();
-//  Position* position = (Position*)arg;
-//  while (!stop && position->depth < 5) {
-//    minimax(*position, position->depth + 1, INT_MIN, INT_MAX);
-//  }
-//  // std::cout << "Premoves thread ending";
-//  thread_count--;
-//  _endthread();
-//}
-
 
 
 
