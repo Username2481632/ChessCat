@@ -72,7 +72,10 @@ struct Point {
   Point(int r, int c) : row(r), column(c) {}
   void clear() { row = column = -1;
   }
-
+  void Set(int r, int c) {
+    row = r;
+    column = c;
+  };
   bool operator==(const Point& other) const {
     return row == other.row && column == other.column;
   }
@@ -1235,7 +1238,7 @@ void new_generate_moves(Position& position) {
                     new_position->board[i][j];
                 new_position->fifty_move_rule = 0;
                 new_position->board[i][j].empty();
-
+                new_position->en_passant_target.Set(i + multiplier, j);
                 position.outcomes->emplace_back(new_position);
               }
             }
@@ -2235,13 +2238,7 @@ const uint64_t max_bytes = (1 << 30) * (uint64_t)15;
 
 void minimax(Position& position, int depth, double alpha, double beta,
              bool* stop/*, bool reasonable_extension*//*, bool selective_deepening*//*, int initial_material*/) {
-  if (*stop || position.depth >= depth /* && !selective_deepening)*/) {
-     //if (position.outcomes) {
-     //  Position* best_move = GetBestMove(&position);
-     //  if (!best_move) {
-     //    int hi = 2;
-     //  }
-     //}
+  if (*stop || position.depth >= depth) {
      return;
   }
   if (position.fifty_move_rule >= 6) {
@@ -2256,12 +2253,6 @@ void minimax(Position& position, int depth, double alpha, double beta,
          if (occurrences == 3) {
           position.evaluation = 0.0;
           position.depth = 0;
-          //if (position.outcomes) {
-          //  Position* best_move = GetBestMove(&position);
-          //  if (!best_move) {
-          //    int hi = 2;
-          //  }
-          //}
           return;
          }
        }
@@ -2287,12 +2278,6 @@ void minimax(Position& position, int depth, double alpha, double beta,
   }
   if (position.fifty_move_rule >= 100) {  // fifty move rule
     position.evaluation = 0;
-    //if (position.outcomes) {
-    //   Position* best_move = GetBestMove(&position);
-    //   if (!best_move) {
-    //     int hi = 2;
-    //   }
-    //}
     return;
   }
   if (position.outcomes->size() <= 3) {
@@ -2336,21 +2321,16 @@ void minimax(Position& position, int depth, double alpha, double beta,
   } else {
      initial_evaluation = position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
   }
-  //double position_material = round(position.evaluation);
 
-  //int c = 0;
   for (size_t c = 0; c < position.outcomes->size(); c++) {
 
-     //} else {
      if (depth == 0) {
        if ((*position.outcomes)[c]->evaluation == initial_evaluation) {
          if (!*stop) {
           position.depth = 0;
          }
          return;
-         //if (initial_evaluation > position.evaluation) {
-         // position.evaluation = initial_evaluation;
-         //}
+
        } else {
          assert(round(initial_evaluation) !=
                 round((*position.outcomes)[c]->evaluation));
@@ -2358,10 +2338,8 @@ void minimax(Position& position, int depth, double alpha, double beta,
                  reasonable_extension *//*, initial_material*/);
        }
      } else {
-       minimax(*(*position.outcomes)[c], depth - 1, alpha, beta, stop/*,
-               reasonable_extension *//*, initial_material*/);
+       minimax(*(*position.outcomes)[c], depth - 1, alpha, beta, stop);
      }
-     //}
     
      if (position.white_to_move) {
 
@@ -2376,31 +2354,20 @@ void minimax(Position& position, int depth, double alpha, double beta,
          alpha = (*position.outcomes)[c]->evaluation;
        }
      } else {
-       if (/*position.evaluation == INT_MAX || LessOutcome(*/ (
-               *position.outcomes)[c]
-               ->evaluation < position.evaluation) {
+       if ((*position.outcomes)[c]->evaluation < position.evaluation) {
          position.evaluation = (*position.outcomes)[c]->evaluation;
-
        }
        if ((*position.outcomes)[c]->evaluation < beta) {
          beta = (*position.outcomes)[c]->evaluation;
        }
      }
      if (beta <= alpha) {
-
        return;
      }
   }
-  if (!*stop/* && c == position.outcomes->size()*/) {
- /*   if (depth <= 0) {
-      position.depth = 1;
-    } else {*/
+  if (!*stop) {
       position.depth = depth;
-    //}
   }
-  //Position* best_move = GetBestMove(&position);
-  //assert(best_move->evaluation == position.evaluation);
- 
 }
 
 int thread_count = 0;
@@ -2493,31 +2460,9 @@ void calculate_moves(void* varg) {
   ThreadInfo* input = (ThreadInfo*)varg;
 
   while (true) {
-    //printf("[calculate_moves %d] loop.  outcomes=%p, size=%d\n",
-    //       GetCurrentThreadId(), input->position->outcomes,
-    //       input->position->outcomes ? input->position->outcomes->size() : 0);
-     
-     
-     
-    
-    // if (!input->position->outcomes) {
-    //  generate_moves(*input->position);
-    //}
-    
-    //max_depth =
-    //    (int)floor(log2((((double)max_bytes / 32.0) *
-    //                    input->position->outcomes->size()) / sizeof(Position)) /
-    //               log2(32));
     if (!*input->stop) {
 
       if (input->position->to_move == input->side) {
-        //printf("[calculate_moves] minimax start");
-        //if (input->position->depth >= min_depth) {
-        //  minimax(*input->position, min_depth, INT_MIN,
-        //          INT_MAX, input->stop, true,
-        //          (int)round(EvaluateMaterial(*input->position)));
-
-        //}
          double alpha, beta;
          double alpha_aspiration_window = aspiration_window;
          double beta_aspiration_window = aspiration_window;
@@ -2530,7 +2475,7 @@ void calculate_moves(void* varg) {
             alpha = INT_MIN;
             beta = INT_MAX;
           }
-          minimax(*input->position, input->position->depth + 1, alpha, beta, input->stop/*, true, EvaluateMaterial(*input->position)*/);
+          minimax(*input->position, input->position->depth + 1, alpha, beta, input->stop);
           if (input->position->evaluation <= alpha) {
             alpha_aspiration_window *= 4;
           } else if (input->position->evaluation >= beta) {
@@ -2541,50 +2486,37 @@ void calculate_moves(void* varg) {
             approximate_evaluation = input->position->evaluation;
           }
         }
-        //if (abs(EvaluateMaterial(*input->position) - (int)
-        //        round(input->position->evaluation)) > reasonability_limit) {
-        //  minimax(*input->position, input->position->depth, INT_MIN, INT_MAX,
-        //          input->stop/*, false, (int) round(input->position->evaluation)*/);
-        //}
+
         done = true;
         *input->stop = true;
         done_cv.notify_one();
 
       } else {
-        //PROCESS_MEMORY_COUNTERS_EX pmc{};
-        //GetProcessMemoryInfo(GetCurrentProcess(),
-        //                     (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
-        while (!*input->stop/* && (deleting != 0 || pmc.WorkingSetSize < max_bytes)*/) {
+        while (!*input->stop) {
           for (int i = 0;
                i < input->position->outcomes->size() && !*input->stop; i++) {
-            minimax(*(*input->position->outcomes)[i],
-                    std::max(min_depth, (*input->position->outcomes)[i]->depth + 1),
-                    INT_MIN, INT_MAX, input->stop/*, true,
-                    (int)round(EvaluateMaterial(*input->position))*/);
+            minimax(
+                *(*input->position->outcomes)[i],
+                std::max(min_depth, (*input->position->outcomes)[i]->depth + 1),
+                INT_MIN, INT_MAX, input->stop);  // do position->depth + 1 while
+                                                 // position->depth < min_depth
           }
-          /*minimax(*input->position,
-                  std::max(min_depth + 1, input->position->depth + 1), INT_MIN,
-                  INT_MAX, input->stop, true,
-                  (int) round(EvaluateMaterial(*input->position)));*/
-          //GetProcessMemoryInfo(GetCurrentProcess(),
-          //                     (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
         }
-        //*input->stop = true;
       }
-
     }
     if (*input->stop) {
       waiting.release();
-      //printf("[calculate_moves %d] block.\n", GetCurrentThreadId());
+      // printf("[calculate_moves %d] block.\n", GetCurrentThreadId());
       std::unique_lock lk(stop_cv_mutex);
       stop_cv.wait(lk, [input] { return !*input->stop; });
       if (!input->position->outcomes) {
         new_generate_moves(*input->position);
       }
       if (input->position->to_move ==
-                  input->side && /*(input->position->depth >= min_depth ||*/
-              input->position->outcomes->size() == 1/*)*/) {
-        input->position->evaluation = (*input->position->outcomes)[0]->evaluation;
+              input->side && /*(input->position->depth >= min_depth ||*/
+          input->position->outcomes->size() == 1 /*)*/) {
+        input->position->evaluation =
+            (*input->position->outcomes)[0]->evaluation;
         done = true;
         *input->stop = true;
         done_cv.notify_one();
@@ -3266,78 +3198,8 @@ int main() {
     }
     board.emplace_back(row);
   }
-  int max_positions = 2500000;
-  //while (true) {
-  //  Position* position = Position::StartingPosition();
-  //  std::string fen;
-  //  std::cout << "FEN: ";
-  //  std::getline(std::cin, fen);
-  //  std::stringstream elements_line(fen);
-  //  std::vector<std::string> elements;
-  //  for (int i = 0; i < 6; i++) {
-  //    std::string s;
-  //    elements_line >> s;
-  //    elements.push_back(s);
-  //  }
-  //  int i = 0;
-  //  int j = 0;
-  //  for (int k = 0; k < elements[0].length(); k++) {
-  //    if (elements[0][k] == '/') {
-  //      i++;
-  //      j = 0;
-  //      continue;
-  //    }
-  //    if (i < 0 || i > 7 || j < 0 || j > 7) {
-  //      std::cout << "FEN error";
-  //      exit(1);
-  //    }
-  //    if (isdigit(elements[0][k])) {
-  //      for (int l = char_to_int(elements[0][k]); l > 0; l--) {
-  //        if (j > 7) {
-  //          std::cout << "FEN error";
-  //          exit(1);
-  //        }
-  //        position->board[i][j].empty();
-  //        j++;
-  //      }
-  //    } else {
-  //      if (islower(elements[0][k])) {
-  //        position->board[i][j].color = 'B';
-  //      } else {
-  //        position->board[i][j].color = 'W';
-  //      }
-  //      position->board[i][j].type = toupper(elements[0][k]);
-  //      j++;
+  const int max_positions = 2600000;
 
-  //    }
-
-  //  }
-  //  position->to_move = toupper(elements[1][0]);
-  //  if (elements[2][0] == 'K') {
-  //    position->castling.white_o_o = true;
-  //  }
-  //  if (elements[2][0] == 'Q') {
-  //    position->castling.white_o_o_o = true;
-  //  }
-  //  if (elements[2][0] == 'k') {
-  //    position->castling.black_o_o = true;
-  //  }
-  //  if (elements[2][0] == 'q') {
-  //    position->castling.black_o_o_o = true;
-  //  }
-  //  if (elements[3] != "-") {
-  //    position->en_passant_target.row = elements[3][0] - 'a';
-  //    position->en_passant_target.column = char_to_int(elements[3][1]);
-  //  } else {
-  //    position->en_passant_target.clear();
-  //  }
-  //  position->fifty_move_rule = stoi(elements[4]);
-
-  //  std::cout << "Evaluation: "
-  //            << EvaluateMaterial(*position) + EvaluateMobility(*position) << std::endl;
-  //}
-  //
-  //int rounding = 1e7;
   bool white_O_O = true;
   bool white_O_O_O = true;
   bool black_O_O = true;
@@ -3387,8 +3249,6 @@ int main() {
   
   // standard notation: type the coordinates of the starting and end point (such as 6444 for e4). if you type one more point, that point becomes an empty square (for en passant). For castling, type the king move and the rook move right after each other. For promotions, add =[insert piece type] after the pawn move (such as 1404=Q) piece types are Q, B, R, N.
 
-
-  //new_generate_moves(*position);
   char color;
   bool game_over = false;
   std::cout << "What color am I playing? ";
@@ -3451,10 +3311,6 @@ int main() {
   t_c_mutex.unlock();
   _beginthread(calculate_moves, 0, info);
   while (true) {
-    /*if (position->outcomes == nullptr) {
-      generate_moves(*position);
-    }*/
-    //SavePosition(*position);
     if (color == position->to_move && engine_on) {
       //printf("[main thread %d] block.\n", GetCurrentThreadId());
       std::cout << "My move: ";
@@ -3463,15 +3319,7 @@ int main() {
         std::unique_lock lk(done_cv_mtx);
         done_cv.wait(lk, [] { return done; });
       }
-      //stop_mutex.lock();
-      //*info->stop = true;
-      //stop_mutex.unlock();
-      // making_move.lock();
-      //stop_mutex.lock();
-      //*info->stop = true;
-      //stop_mutex.unlock();
       waiting.acquire();
-      //working.lock();
       game_status = CheckGameOver(position);
       Position* best_move;
 
@@ -3493,28 +3341,8 @@ ComplicatedLessOutcome);
         std::string move_string =
             GetMove(*position, *best_move, chess_notation);
 
-        /*while (position->time < minimum_time || position->depth < min_depth) {
-          minimax(*position, position->depth + 1, INT_MIN, INT_MAX);
-          if (position->outcomes->size() == 1 ||
-              position->outcomes->size() == 0) {
-            break;
-          }
-        }*/
-        // delete position;
-        // Sleep(1000);
-        // return 0;
-        /*for (int i = 0; i < position.outcomes->size(); i++) {
-          for (int j = 0; j < 8; j++) {
-            for (int k = 0; k < 8; k++) {
-              std::cout << (*position.outcomes)[i]->board[j][k] << std::endl;
-            }
-          }
-        }*/
-
-        // position = best_move;
         game_status = CheckGameOver(best_move);
 
-        // SavePosition(*best_move);
 
         UpdatePGN(best_move, move_string);
 
@@ -3552,15 +3380,6 @@ ComplicatedLessOutcome);
             std::cout << "[got next move] ";
           }
           std::cout << "[finished line]" << std::endl;
-          //std::cout << "e4 line: "
-          //          << "(" << GetPosition(*position, "e4")->evaluation << " evaluation) "
-          //          << "e4 ";
-          //std::vector<Position*> e_line = GetLine(GetPosition(*position, "e4"));
-          //for (size_t i = 1; i < line.size(); i++) {
-          //  std::cout << ' ' << GetMove(*line[i - 1], *line[i], chess_notation);
-          //  //std::cout << "[got next move] ";
-          //}
-          //std::cout << std::endl;
           std::cout << "Moves: " << best_move->outcomes->size() << std::endl
                     << "Material: " << (float) CountMaterial(*best_move) / 2.0 << std::endl;
         }
@@ -3585,9 +3404,6 @@ ComplicatedLessOutcome);
     std::cout << "Your move: ";
     std::cin >> move;
 
-    //move = GetMove(*position, (*(*position->outcomes)[0]), chess_notation);
-    //std::cout << move << std::endl;
-    //  stop = true;
      lower_move = ToLower(move);
     if (lower_move == "disable") {
       engine_on = false;
@@ -3596,14 +3412,10 @@ ComplicatedLessOutcome);
       engine_on = true;
       continue;
     } else if (move.length() == 1) {
-      std::cout << "Invalid move." << std::endl;
+      new_position = nullptr;
     } else if (move[0] == '+' || move[0] == '-') {
-      if (move.length() == 1) {
-        std::cout << "Invalid move." << std::endl;
-      } else {
-        result = SeekPosition(
+      result = SeekPosition(
             position, (move[0] == '+' ? 1 : -1) * stoi(move.substr(1, (move.length() - 1))));
-      }
       if (!result.first) {
         std::cout << "Invalid seek." << std::endl;
         continue;
@@ -3621,9 +3433,6 @@ ComplicatedLessOutcome);
             std::cout << MakeString(*new_position, chess_notation, white_on_bottom) << std::endl;
             std::cout << Convert(new_position->evaluation) << std::endl;
       }
-      //if (new_position->to_move == color) {
-      //      std::cout << "My move: ";
-      //}
       game_over = false;
       info->trash->emplace_back(position, nullptr);
       position = new_position;
@@ -3635,7 +3444,7 @@ ComplicatedLessOutcome);
       continue;
     } else if (game_over) {
       new_position = nullptr;
-    }    else if (chess_notation) {
+    } else if (chess_notation) {
       new_position = GetPosition(*position, move);
     } else {
       new_board = position->board;
