@@ -1043,14 +1043,6 @@ bool was_capture(const Board& board1, const Board& board2) {
   return false;
 }
 
-// using Possibilities = std::map<Pair, double>;
-
-// struct Minimax {
-//   double evaluation;
-//   // Castling castling;
-//   HistoryType move_history;
-//   // Possibilities possibilities;
-// };
 
 const char promotion_pieces[4] = {'Q', 'R', 'B', 'N'};
 
@@ -2230,7 +2222,7 @@ int min_depth = 4;  // no less than 2
 //
 // uint64_t safe_bytes = (1 << 30) * (uint64_t)8;
 //const uint64_t minimum_bytes = (1 << 30) * (uint64_t)4;
-const uint64_t max_bytes = (1 << 30) * (uint64_t)15;
+const uint64_t max_bytes = (1 << 30) * (uint64_t)16;
 //const int deepening_depth = 2;
 
 //int reasonability_limit = 8;
@@ -2252,7 +2244,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
          occurrences++;
          if (occurrences == 3) {
           position.evaluation = 0.0;
-          position.depth = 0;
+          position.depth = 1000;
           return;
          }
        }
@@ -2265,7 +2257,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
   }
 
   if (position.outcomes->size() == 0) {
-    position.depth = depth;
+    position.depth = 1000;
     if (InCheck(position, position.to_move)) {
        position.evaluation =
            position.white_to_move
@@ -2278,6 +2270,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
   }
   if (position.fifty_move_rule >= 100) {  // fifty move rule
     position.evaluation = 0;
+    position.depth = 1000;
     return;
   }
   if (position.outcomes->size() <= 3) {
@@ -2328,6 +2321,8 @@ void minimax(Position& position, int depth, double alpha, double beta,
        if ((*position.outcomes)[c]->evaluation == initial_evaluation) {
          if (!*stop) {
           position.depth = 0;
+         } else {
+          position.depth = -1;
          }
          return;
 
@@ -2362,11 +2357,14 @@ void minimax(Position& position, int depth, double alpha, double beta,
        }
      }
      if (beta <= alpha) {
+       position.depth = -1;
        return;
      }
   }
   if (!*stop) {
       position.depth = depth;
+  } else {
+      position.depth = -1;
   }
 }
 
@@ -2448,7 +2446,73 @@ std::vector<Position*> GetLine(Position* position) {
   return line;
 }
 
+int CheckGameOver(Position* position) {
+  if (position->outcomes->size() == 0) {
+    if (position->white_to_move && InCheck(*position, 'W')) {
+      return -1;
+    }
+    if (!position->white_to_move && InCheck(*position, 'B')) {
+      return 1;
+    }
+    return 0;
+  }
+  if (position->fifty_move_rule >= 100) {
+    return 0;
+  }
+  if (position->fifty_move_rule >= 6) {
+    int occurrences = 1;
+    Position* previous_move = position;
+    for (int i = 0; i < position->fifty_move_rule; i += 2) {
+      previous_move = previous_move->previous_move->previous_move;
+      if (previous_move->board == position->board &&
+          previous_move->castling == position->castling &&
+          previous_move->en_passant_target == position->en_passant_target) {
+         occurrences++;
+         if (occurrences == 3) {
+          return 0;
+         }
+      }
+    }
+  }
+  return 2;
+}
+
+
 const double aspiration_window = 0.25;
+
+
+void SearchPosition(Position* position, int minimum_depth, bool* stop) {
+  int depth = position->depth + 1;
+  double alpha, beta;
+  double alpha_aspiration_window = aspiration_window;
+  double beta_aspiration_window = aspiration_window;
+  double approximate_evaluation = position->evaluation;
+  if (!position->outcomes) {
+    new_generate_moves(*position);
+  }
+  while (depth <= minimum_depth && !*stop && CheckGameOver(position) == 2) {
+    if (depth > 2) {
+      alpha = position->evaluation - aspiration_window;
+      beta = position->evaluation + aspiration_window;
+    } else {
+      alpha = INT_MIN;
+      beta = INT_MAX;
+    }
+    minimax(*position, depth, alpha, beta,
+            stop);
+    if (position->evaluation <= alpha) {
+      alpha_aspiration_window *= 4;
+    } else if (position->evaluation >= beta) {
+      beta_aspiration_window *= 4;
+    } else {
+      alpha_aspiration_window = beta_aspiration_window = aspiration_window;
+      approximate_evaluation = position->evaluation;
+      depth++;
+    }
+  }
+}
+
+
 
 void calculate_moves(void* varg) {
   //double minimum_time = 3;
@@ -2477,9 +2541,9 @@ void calculate_moves(void* varg) {
           }
           minimax(*input->position, input->position->depth + 1, alpha, beta, input->stop);
           if (input->position->evaluation <= alpha) {
-            alpha_aspiration_window *= 4;
+            alpha_aspiration_window *= 4; // unexpected advantage for black
           } else if (input->position->evaluation >= beta) {
-            beta_aspiration_window *= 4;
+            beta_aspiration_window *= 4; // unexpected advantage for white
           } else {
             alpha_aspiration_window = beta_aspiration_window =
                 aspiration_window;
@@ -2495,10 +2559,9 @@ void calculate_moves(void* varg) {
         while (!*input->stop) {
           for (int i = 0;
                i < input->position->outcomes->size() && !*input->stop; i++) {
-            minimax(
-                *(*input->position->outcomes)[i],
-                std::max(min_depth, (*input->position->outcomes)[i]->depth + 1),
-                INT_MIN, INT_MAX, input->stop);  // do position->depth + 1 while
+            SearchPosition(
+                (*input->position->outcomes)[i],
+                std::max(min_depth, (*input->position->outcomes)[i]->depth + 1), input->stop);  // do position->depth + 1 while
                                                  // position->depth < min_depth
           }
         }
@@ -2548,31 +2611,7 @@ void calculate_moves(void* varg) {
   
 }
 
-// void DeepDelete(Position& position) {
-//   /*if (position.outcomes != nullptr) {
-//     for (int i = 0; i < position.outcomes->size(); i++) {
-//       DeepDelete(*(*position.outcomes)[i]);
-//       delete (*position.outcomes)[i];
-//       (*position.outcomes)[i];
-//     }
-//     delete position.outcomes;
-//     position.outcomes;
-//   }*/
-//   delete &position;
-// }
 
-int CheckGameOver(Position* position) {
-  if (position->outcomes->size() == 0) {
-    if (position->white_to_move && InCheck(*position, 'W')) {
-      return -1;
-    }
-    if (!position->white_to_move && InCheck(*position, 'B')) {
-      return 1;
-    }
-    return 0;
-  }
-  return 2;
-}
 
 using VBoard = std::vector<std::vector<std::string>>;
 
@@ -2624,7 +2663,7 @@ std::string GetMove(Position& position1, Position& position2,
     if (position2.board[differences[0].row][differences[0].column]
       .color == ' ') {
       if (chess_notation) {
-        return std::string({char('a'+ differences[2].column), 'x', char('a' + differences[1].column), char(8 - differences[0].row)});
+        return std::string({char('a'+ differences[2].column), 'x', char('a' + differences[1].column), char('0' + 8 - differences[0].row)});
       } else {
         std::stringstream output;
         output << differences[2].row << differences[2].column << differences[1].row << differences[1].column << differences[0].row << differences[1].column;
@@ -2634,7 +2673,7 @@ std::string GetMove(Position& position1, Position& position2,
       if (chess_notation) {
         return std::string({char('a' + differences[2].column), 'x',
                             char('a' + differences[0].column),
-                            char(8 - differences[0].row)});
+                            char('0' + 8 - differences[0].row)});
       } else {
         std::stringstream output;
         output << differences[2].row << differences[2].column
@@ -2916,6 +2955,7 @@ Position* ReadPGN(Position* position) {
     for (int i = 1; (i < moves_match.size() && moves_match[i].matched); i++) {
       position_number++;
       new_generate_moves(*position);
+      assert(GetPosition(*position, moves_match[i]));
       position = GetPosition(*position, moves_match[i]);
       //moves_match[i];
     }
