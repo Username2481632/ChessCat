@@ -401,8 +401,8 @@ void GetCheckInfo(Check& output, Position& position, char side = ' ') {
       }
     }
   }*/
-  size_t i = position.kings[side].row;
-  size_t j = position.kings[side].column;
+  size_t i = (size_t)position.kings[side].row;
+  size_t j = (size_t)position.kings[side].column;
   // pawn check
   if (side == 'W') {
     opponent = 'B';
@@ -515,7 +515,8 @@ void GetCheckInfo(Check& output, Position& position, char side = ' ') {
             position.board[new_i][new_j].type == 'Q') {
           if (found.row != -1) {
             if (position.board[found.row][found.column].type == 'R' ||
-                position.board[found.row][found.column].type == 'Q') {
+                position.board[found.row][found.column].type == 'Q' ||
+                position.board[found.row][found.column].type == 'P') {
               // (position.board[new_i][new_j].type != 'Q' ?
               // (position.board[found.row][found.column].type !=
               // position.board[new_i][new_j].type ||
@@ -572,8 +573,8 @@ bool InCheck(Position& position, char side, int ki = -1, int kj = -1) {
       }
     }
   }*/
-  size_t i = ki == -1 ? position.kings[side].row : ki;
-  size_t j = kj == -1 ? position.kings[side].column : kj;
+  size_t i = ki == -1 ? position.kings[side].row : (size_t)ki;
+  size_t j = kj == -1 ? position.kings[side].column : (size_t)kj;
   // pawn check
   new_i = (int)i + (side == 'W' ? -1 : 1);
   if (new_i >= 0 && new_i <= 7 &&
@@ -702,8 +703,6 @@ double EvaluateMobility(Position& position) {
   Check black_check;
   GetCheckInfo(white_check, position);
   GetCheckInfo(black_check, position);
-  bool blocks = true;
-  bool pins = true;
   int new_i, new_j;
   double mobility_score = 0;
   Check* check;
@@ -760,7 +759,7 @@ double EvaluateMobility(Position& position) {
             // one square
 
             if (position.board[new_i][j].color == ' ') {
-              if (MoveOk(*check, (int)i, (int)j, new_i, (int)j)) {
+              if (MoveOk(*check, i, j, (size_t)new_i, j)) {
                 moves += 2;
               }
             }
@@ -958,7 +957,7 @@ double EvaluateMobility(Position& position) {
             if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
                 position.board[new_i][new_j].color !=
                     position.board[i][j].color) {
-              if (MoveOk(*check, (int)i, (int)j, new_i, new_j)) {
+              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
                 moves++;
               }
             }
@@ -978,7 +977,7 @@ double EvaluateMobility(Position& position) {
                   position.board[i][j].color) {
                 break;
               }
-              if (MoveOk(*check, (int)i, (int)j, new_i, new_j)) {
+              if (MoveOk(*check, i, j, new_i, new_j)) {
                 moves++;
               }
               if (position.board[new_i][new_j].color == opponent) {
@@ -1003,7 +1002,7 @@ double EvaluateMobility(Position& position) {
                   position.board[i][j].color) {
                 break;
               }
-              if (MoveOk(*check, i, j, new_i, new_j)) {
+              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
                 moves++;
               }
               if (position.board[new_i][new_j].color == opponent) {
@@ -1051,7 +1050,7 @@ int char_to_int(char c) { return (int)c - int('0'); }
 
 const std::set<char> pieces = {'K', 'Q', 'R', 'B', 'N'};
 
-const int mate = 10000;
+const int mate = 20000;
 
 
 
@@ -1168,7 +1167,7 @@ void new_generate_moves(Position& position) {
             for (int k = 0; k < 4; k++) {
               // one square
               if (position.board[new_i][j].color == ' ' &&
-                  MoveOk(check_info, i, j, new_i, j)) {
+                  MoveOk(check_info, i, j, (size_t)new_i, j)) {
                 new_position = base_position.CreateDeepCopy();
                 new_position->board[i + multiplier][j].color =
                     new_position->board[i][j].color;
@@ -1653,8 +1652,8 @@ struct Move {
   char promotion;
   Move()
       : check(false),
-        start({-1, -1}),
         dest({-1, -1}),
+        start({-1, -1}),
         capture(false),
         checkmate(false),
         promotion(' '),
@@ -1730,6 +1729,7 @@ Board GetBoard(Move info, const Position& position) {
           j += bishop_moves[k][1];
         }
       }
+      [[fallthrough]];
     }
     case 'R': {
       char opponent = position.to_move == 'W' ? 'B' : 'W';
@@ -2255,6 +2255,9 @@ void minimax(Position& position, int depth, double alpha, double beta,
   if (!position.outcomes) {
     new_generate_moves(position);
   }
+  else {
+    position.evaluation = EvaluateMaterial(position);
+  }
 
   if (position.outcomes->size() == 0) {
     position.depth = 1000;
@@ -2292,10 +2295,10 @@ void minimax(Position& position, int depth, double alpha, double beta,
 
   std::sort(position.outcomes->begin(), position.outcomes->end(),
             position.white_to_move ? GreaterOutcome : LessOutcome);
-  double initial_evaluation;
+  double initial_evaluation = position.evaluation;
   if (depth == 0 &&
       position.outcomes->back()->evaluation == position.evaluation) {
-     initial_evaluation = position.evaluation;
+     //initial_evaluation = position.evaluation;
      position.evaluation =
          round(position.evaluation) + EvaluateMobility(position);
      if (position.white_to_move) {
@@ -2312,7 +2315,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
      }
 
   } else {
-     initial_evaluation = position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
+     position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
   }
 
   for (size_t c = 0; c < position.outcomes->size(); c++) {
