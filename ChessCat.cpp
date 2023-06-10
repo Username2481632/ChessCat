@@ -1,31 +1,32 @@
 #include <Windows.h>
 #include <assert.h>
 #include <process.h>
+#include <psapi.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
 #include <ctime>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <map>
+#include <mutex>
+#include <ratio>
 #include <regex>
+#include <semaphore>
 #include <set>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <semaphore>
-#include <mutex>
-#include <condition_variable>
-#include <chrono>
-#include <ratio>
-#include <cstdint>
-#include <psapi.h>
 #undef min
 #undef max
 
-std::map<char, int> piece_values = {{'P', 1}, {'N', 3}, {'B', 3}, {'R', 5},
-                                    {'Q', 9}};
+std::map<char, int> piece_values = {
+    {'P', 1}, {'N', 3}, {'B', 3}, {'R', 5}, {'Q', 9}};
 const int knight_moves[8][2] = {{-2, -1}, {-2, 1}, {-1, 2},  {1, 2},
                                 {2, 1},   {2, -1}, {-1, -2}, {1, -2}};
 const int bishop_moves[4][2] = {{-1, -1}, {-1, 1}, {1, 1}, {1, -1}};
@@ -106,7 +107,7 @@ struct Castling {
 
 };
 
-using Board = std::vector<std::vector<Piece>>;
+using Board = std::array<std::array<Piece, 8>, 8>;
 struct Kings {
   Point white_king;
   Point black_king;
@@ -116,27 +117,35 @@ struct Kings {
   Kings(Point wk, Point bk) : white_king(wk), black_king(bk){};
 };
 
-// int g_copied_boards = 0;
-//int boards_created = 0;
-//int boards_destroyed = 0;
+ //int g_copied_boards = 0;
+ //int boards_created = 0;
+ //int boards_destroyed = 0;
 
 Board starting_board = {
-    {Piece(black, 'R'), Piece(black, 'N'), Piece(black, 'B'), Piece(black, 'Q'),
-     Piece(black, 'K'), Piece(black, 'B'), Piece(black, 'N'), Piece(black, 'R')},
-    {Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P'),
-     Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P')},
-    {Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' ')},
-    {Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' ')},
-    {Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' ')},
-    {Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' ')},
-    {Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P'),
-     Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P')},
-    {Piece(white, 'R'), Piece(white, 'N'), Piece(white, 'B'), Piece(white, 'Q'),
-     Piece(white, 'K'), Piece(white, 'B'), Piece(white, 'N'), Piece(white, 'R')}};
+    {{{Piece(black, 'R'), Piece(black, 'N'), Piece(black, 'B'),
+       Piece(black, 'Q'), Piece(black, 'K'), Piece(black, 'B'),
+       Piece(black, 'N'), Piece(black, 'R')}},
+     {{Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P'),
+       Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P'),
+       Piece(black, 'P'), Piece(black, 'P')}},
+     {{Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' ')}},
+     {{Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' ')}},
+     {{Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' ')}},
+     {{Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' ')}},
+     {{Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P'),
+       Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P'),
+       Piece(white, 'P'), Piece(white, 'P')}},
+     {{Piece(white, 'R'), Piece(white, 'N'), Piece(white, 'B'),
+       Piece(white, 'Q'), Piece(white, 'K'), Piece(white, 'B'),
+       Piece(white, 'N'), Piece(white, 'R')}}}};
 
 struct IntPoint {
   int row;
@@ -255,137 +264,6 @@ using HistoryType = std::vector<Position>;
 using MovesType = std::vector<Pair>;
 // using Possibilities = std::vector<Position>;
 
-int count_moves(const Position& position, size_t i, size_t j) {
-  int moves_count = 0;
-  int new_i, new_j;
-  Color opponent = position.board[i][j].color == white ? black : white;
-  switch (position.board[i][j].type) {
-    case 'P':
-      // captures
-      if (j > 0 && position.board[i][j - 1].color == opponent) {
-        moves_count++;
-      }
-      if (j < 7 && position.board[i][j + 1].color == opponent) {
-        moves_count++;
-      }
-      // moving forward
-      if (position.board[i][j].color == white) {
-        // one square forward
-        if (position.board[i - 1][j].color == empty) {
-          moves_count++;
-
-          // two squares forward
-          if (i == 6 && position.board[4][j].color == empty) {
-            moves_count++;
-          }
-        }
-      } else if (position.board[i + 1][j].color == empty) {
-        // one square forward
-        moves_count++;
-
-        // two squares forward
-        if (i == 1 && position.board[3][j].color == empty) {
-          moves_count++;
-        }
-      }
-      break;
-    case 'N':
-      for (size_t k = 0; k <= 7; k++) {
-        new_i = (int)i + knight_moves[k][0];
-        if (new_i >= 0 && new_i <= 7) {
-          new_j = (int)j + knight_moves[k][1];
-          if (new_j >= 0 && new_j <= 7 &&
-              position.board[(size_t)new_i][(size_t)new_j].color !=
-                  position.board[i][j].color) {
-            moves_count++;
-          }
-        }
-      }
-      break;
-    case 'Q':
-    case 'B':
-      for (size_t k = 0; k < 4; k++) {
-        int max_times = (int)std::min(bishop_moves[k][0] == 1 ? (7 - i) : i,
-                                 bishop_moves[k][1] == 1 ? (7 - j) : j);
-        for (int t = 0; t < max_times; t++) {
-          new_i = (int)i + bishop_moves[k][0];
-          new_j = (int)j + bishop_moves[k][1];
-          if (position.board[(size_t)new_i][(size_t)new_j].color !=
-              position.board[i][j].color) {
-            moves_count++;
-          } else {
-            break;  // ran into own piece
-          }
-          if (position.board[(size_t)new_i][(size_t)new_j].color == opponent) {
-            break;  // captured opponent
-          }
-        }
-      }
-      if (position.board[i][j].type == 'B') {
-        break;
-      }
-    case 'R':
-      // move left
-      for (new_j = (int)j - 1; new_j >= 0; new_j--) {
-        if (position.board[i][(size_t)new_j].color == position.board[i][j].color) {
-          break;  // ran into own piece
-        }
-        moves_count++;
-        if (position.board[i][(size_t)new_j].color == opponent) {
-          break;  // captured opponent and can't go further
-        }
-      }
-
-      // move up
-      for (new_i = (int)i - 1; new_i >= 0; new_i--) {
-        if (position.board[(size_t)new_i][j].color == position.board[i][j].color) {
-          break;
-        }
-        moves_count++;
-        if (position.board[(size_t)new_i][j].color == opponent) {
-          break;
-        }
-      }
-
-      // move right
-      for (new_j = (int)j + 1; new_j <= 7; new_j++) {
-        if (position.board[i][(size_t)new_j].color == position.board[i][j].color) {
-          break;
-        }
-        moves_count++;
-        if (position.board[i][(size_t)new_j].color == opponent) {
-          break;
-        }
-      }
-
-      // move down
-      for (new_i = (int)i + 1; new_i <= 7; new_i++) {
-        if (position.board[(size_t)new_i][j].color == position.board[i][j].color) {
-          break;
-        }
-        moves_count++;
-        if (position.board[(size_t)new_i][j].color == opponent) {
-          break;
-        }
-      }
-      break;
-    case 'K':
-      for (size_t k = 0; k < 8; k++) {
-        new_i = (int)i + king_moves[k][0];
-        if (new_i >= 0 && new_i <= 7) {
-          new_j = (int)j + king_moves[k][1];
-          if (new_j >= 0 && new_j <= 7 &&
-              position.board[i + king_moves[k][0]][j + king_moves[k][1]]
-                      .color != position.board[i][j].color) {
-            moves_count++;
-          }
-        }
-      }
-  }
-  return moves_count;
-}
-
-
 
 struct Check {
   bool in_check = false;
@@ -403,7 +281,7 @@ void GetCheckInfo(Check& output, Position& position, Color side = empty) {
   /*if (!king_present(position)) {
     int i=1;
   }*/
-  char opponent;
+  Color opponent;
   IntPoint found(-1, -1);
   std::set<Point> done;
   output.in_check = false;
@@ -583,7 +461,7 @@ bool InCheck(Position& position, const Color& side, int ki = -1, int kj = -1) {
   /*if (!king_present(position)) {
     int i=1;
   }*/
-  char opponent = side == white ? black : white;
+  Color opponent = side == white ? black : white;
   /*if (position.kings[side][1] == -1) {
     for (int i = 0; i < 8; i++) {
       for (int j = 0; j < 8; j++) {
@@ -722,7 +600,7 @@ const int king_value = 1000;
 
 
 double EvaluateMobility(Position& position) {
-  char opponent;
+  Color opponent;
   Check white_check;
   Check black_check;
   GetCheckInfo(white_check, position);
@@ -1052,7 +930,7 @@ double EvaluateMobility(Position& position) {
 
 
 int CountMoves(Position& position) {
-  char opponent;
+  Color opponent;
   Check white_check;
   Check black_check;
   GetCheckInfo(white_check, position);
@@ -1431,7 +1309,7 @@ bool board_exists(const Position& position, const Position& new_position) {
 void new_generate_moves(Position& position) {
   Position base_position = position.GenerateMovesCopy();
   //base_position.previous_move = &position;
-  char opponent = position.white_to_move ? black : white;
+  Color opponent = position.white_to_move ? black : white;
   Position* new_position;
   if (position.outcomes == nullptr) {
     position.outcomes = new std::vector<Position*>;
@@ -2003,8 +1881,8 @@ Board GetBoard(Move info, const Position& position) {
         board[(size_t)info.dest[0] - multiplier][(size_t)info.dest[1]].Empty();
       } else {
         board[(size_t)info.dest[0]][(size_t)info.dest[1]] =
-            board[position.white_to_move ? 6 : 1][(size_t)info.dest[1]];
-        board[position.white_to_move ? 6 : 1][(size_t)info.dest[1]].Empty();
+            board[position.white_to_move ? (size_t)6 : (size_t)1][(size_t)info.dest[1]];
+        board[position.white_to_move ? (size_t)6 : (size_t)1][(size_t)info.dest[1]].Empty();
       }
       if (info.promotion != ' ') {
         board[(size_t)info.dest[0]][(size_t)info.dest[1]].type = info.promotion;
@@ -2029,7 +1907,7 @@ Board GetBoard(Move info, const Position& position) {
       return board;
     case 'Q':
     case 'B': {
-      char opponent = to_move == white ? black : white;
+      Color opponent = to_move == white ? black : white;
       for (size_t k = 0; k < 4; k++) {
         int i = info.dest[0] + bishop_moves[k][0];
         int j = info.dest[1] + bishop_moves[k][1];
@@ -2055,7 +1933,7 @@ Board GetBoard(Move info, const Position& position) {
       [[fallthrough]];
     }
     case 'R': {
-      char opponent = to_move == white ? black : white;
+      Color opponent = to_move == white ? black : white;
       for (size_t k = 0; k < 4; k++) {
         int i = info.dest[0] + rook_moves[k][0];
         int j = info.dest[1] + rook_moves[k][1];
@@ -2176,119 +2054,6 @@ Position* GetPosition(Position& position, const std::string& move) {
   return FindPosition(GetBoard(info, position), position);
 }
 
-// void SetPosition(std::string& move, Position& position) {
-//   char piece;
-//   int dest[2];
-//   int start[2] = {-1, -1};
-//   std::vector<int> starting;
-//   Board new_board = position.board;
-//   bool check;
-//   bool capture;
-//   if (move == "O-O") {
-//     if (position.to_move == 'W') {
-//       new_board[7][6] = "WK";
-//       new_board[7][5] = "WR";
-//       new_board[7][4] = "  ";
-//       new_board[7][7] = "  ";
-//       position = *FindPosition(new_board, position);
-//
-//     } else {
-//       new_board[0][6] = "BK";
-//       new_board[0][5] = "BR";
-//       new_board[0][4] = "  ";
-//       new_board[0][7] = "  ";
-//       position = *FindPosition(new_board, position);
-//     }
-//     return;
-//   }
-//   if (move == "O-O-O" || move == "0-0-0") {
-//     if (position.to_move == 'W') {
-//       new_board[7][2] = "WK";
-//       new_board[7][3] = "WR";
-//       new_board[7][4] = "  ";
-//       new_board[7][0] = "  ";
-//       position = *FindPosition(new_board, position);
-//     } else {
-//       new_board[0][2] = "BK";
-//       new_board[0][3] = "BR";
-//       new_board[0][4] = "  ";
-//       new_board[0][0] = "  ";
-//       position = *FindPosition(new_board, position);
-//     }
-//     /*
-//     new_position = FindPosition(new_board, *position);
-//       if (new_position == nullptr) {
-//         position = new_position;
-//       } else {
-//         std::cout << "Invalid move." << std::endl;
-//         continue;
-//       }
-//     */
-//     return;
-//   }
-//   if (pieces.count(move[0])) {
-//     piece = move[0];
-//   } else {
-//     piece = 'P';
-//   }
-//   size_t current = move.length() - 1;
-//   if (move[current] == '+') {
-//     check = true;
-//     current--;
-//   } else {
-//     check = false;
-//   }
-//   dest[0] = 8 - char_to_int(move[current]);
-//   current--;
-//   dest[1] = move[current] - 'a';
-//   current--;
-//   /*
-//   if (current == -1) {
-//     new_board = GetBoard(piece, dest, start, false, check, position);
-//     position = *FindPosition(new_board, position);
-//     return;
-//   }
-//   if (move[current] == 'x') {
-//     capture = true;
-//     current--;
-//     if (current == -1) {
-//       starting = getPiece(piece, dest, board, start, capture, check, color);
-//       output.first[dest[0]][dest[1]] =
-//       output.first[starting[0]][starting[1]];
-//       output.first[starting[0]][starting[1]] = "  ";
-//       return output;
-//     }
-//   } else {
-//     capture = false;
-//   }
-//   if (isdigit(move[current])) {
-//     start[1] = 8 - char_to_int(move[current]);
-//     current--;
-//   }
-//   if (islower(move[current])) {
-//     start[0] = move[current] - 'a';
-//     current--;
-//   }
-//   starting = getPiece(piece, dest, board, start, capture, check, color);
-//   output.first[dest[0]][dest[1]] = output.first[starting[0]][starting[1]];
-//   output.first[starting[0]][starting[1]] = "  ";
-//   return output;
-// }
-// void SaveBoard(const Board& board, const Castling& castling) {
-//   // write board and castling to file
-//   std::ofstream file;
-//   file.open("board.txt");
-//   for (int i = 0; i < 8; i++) {
-//     for (int j = 0; j < 8; j++) {
-//       file << board[i][j] << " ";
-//     }
-//     file << std::endl;
-//   }
-//   for (int i = 0; i < 4; i++) {
-//     file << castling[i] << " ";
-//   }
-//   file.close();*/
-// }
 std::string MakeString(const Position& position, const bool& chess_notation, const bool& white_on_bottom) {
   std::stringstream result;
   if (!chess_notation) {
@@ -2316,6 +2081,9 @@ std::string MakeString(const Position& position, const bool& chess_notation, con
           case empty:
             color = ' ';
             break;
+          default:
+            std::cout << std::endl << "Unknown color error in MakeString.";
+            exit(1);
         }
         result << ' ' << color << position.board[i][j].type
                << " |";
@@ -2345,7 +2113,8 @@ std::string MakeString(const Position& position, const bool& chess_notation, con
         //}
         char color;
         
-        switch (position.board[(size_t)i][(size_t)j].color) { case white:
+        switch (position.board[(size_t)i][(size_t)j].color) {
+          case white:
             color = 'W';
             break;
           case black:
@@ -2354,6 +2123,9 @@ std::string MakeString(const Position& position, const bool& chess_notation, con
           case empty:
             color = ' ';
             break;
+          default:
+            std::cout << std::endl << "Unknown color error in MakeString.";
+            exit(1);
         }
         result << ' ' << color << position.board[(size_t)i][(size_t)j].type
                << " |";
@@ -3022,7 +2794,7 @@ std::string GetMove(Position& position1, Position& position2,
                 origin.row || (size_t)new_j != origin.column) &&
             MoveOk(check_info, (size_t)new_i, (size_t)new_j, (size_t)dest.row,
                    (size_t)dest.column)) {
-          found.emplace_back(new_i, new_j);
+          found.emplace_back((size_t)new_i, (size_t)new_j);
         }
       }
       if (found.size() > 0) {
@@ -3060,7 +2832,7 @@ std::string GetMove(Position& position1, Position& position2,
               (new_i != (int)origin.row || new_j != (int)origin.column) &&
               MoveOk(check_info, (size_t)new_i, (size_t)new_j, (size_t)dest.row,
                      (size_t)dest.column)) {
-            found.emplace_back(new_i, new_j);
+            found.emplace_back((size_t)new_i, (size_t)new_j);
           }
           if (position1.board[(size_t)new_i][(size_t)new_j].color ==
               position2.board[(size_t)dest.row][(size_t)dest.column].color) {
@@ -3629,7 +3401,7 @@ int main() {
 
   ThreadInfo* info = new ThreadInfo(position, new bool(false), new TrashType, color);
   std::string move;
-  Board new_board;
+  Board new_board = position->board;
   bool engine_on = true;
   Position* new_position = nullptr;
   int game_status;
