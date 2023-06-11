@@ -131,9 +131,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ChessCat.cpp" />
+    <ClCompile Include="constants.cpp" />
+    <ClCompile Include="get_check_info.cpp" />
+    <ClCompile Include="position.cpp" />
+    <ClCompile Include="types.cpp" />
+    <ClCompile Include="types.h" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="constants.h" />
+    <ClInclude Include="get_check_info.h" />
+    <ClInclude Include="position.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
