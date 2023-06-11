@@ -27,12 +27,10 @@
 
 std::map<char, int> piece_values = {
     {'P', 1}, {'N', 3}, {'B', 3}, {'R', 5}, {'Q', 9}};
-const int knight_moves[8][2] = {{-2, -1}, {-2, 1}, {-1, 2},  {1, 2},
-                                {2, 1},   {2, -1}, {-1, -2}, {1, -2}};
-const int bishop_moves[4][2] = {{-1, -1}, {-1, 1}, {1, 1}, {1, -1}};
-const int king_moves[8][2] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, 1},
-                              {1, 1},   {1, 0},  {1, -1}, {0, -1}};
-const int rook_moves[4][2] = {{0, -1}, {-1, 0}, {0, 1}, {1, 0}};
+const int knight_moves[8] = {-17, -15, -6, 10, 17, 15, 6, -10};
+const int bishop_moves[4] = {-9, -7, 9, 7};
+const int king_moves[8] = {-9, -8, -7, 1, 9, 8, 7, -1};
+const int rook_moves[4] = {-8, 1, 8, -1};
 
 std::binary_semaphore computed{0};
 std::mutex position_mutex;
@@ -56,7 +54,9 @@ struct Piece {
   bool operator!=(const Piece& other) const {
     return color != other.color || type != other.type;
   }
-  bool operator==(const char* p) const { return color == p[0] && type == p[1]; }
+  bool Equals(const Color& c, const char& t) const {
+    return color == c && type == t;
+  }
   void set(const Color& c, const char& t) {
     color = c;
     type = t;
@@ -67,29 +67,29 @@ struct Piece {
   }
   Piece(const Color& c, const char& t) : color(c), type(t){};
 };
-struct Point {
-  size_t row;
-  size_t column;
-  bool Equals(size_t r, size_t c) { return row == r && column == c; }
-  Point(size_t r, size_t c) : row(r), column(c) {}
-  //void clear() { row = column = -1;
-  //}
-  void Set(size_t r, size_t c) {
-    row = r;
-    column = c;
-  };
-  bool operator==(const Point& other) const {
-    return row == other.row && column == other.column;
-  }
-
-  bool operator<(const Point& other) const {
-    if (row < other.row) return true;
-    if (row > other.row) return false;
-    if (column < other.column) return true;
-    return false;
-  }
-  Point(){}
-};
+//struct Point {
+//  size_t row;
+//  size_t column;
+//  bool Equals(size_t r, size_t c) { return row == r && column == c; }
+//  Point(size_t r, size_t c) : row(r), column(c) {}
+//  //void clear() { row = column = -1;
+//  //}
+//  void Set(size_t r, size_t c) {
+//    row = r;
+//    column = c;
+//  };
+//  bool operator==(const Point& other) const {
+//    return row == other.row && column == other.column;
+//  }
+//
+//  bool operator<(const Point& other) const {
+//    if (row < other.row) return true;
+//    if (row > other.row) return false;
+//    if (column < other.column) return true;
+//    return false;
+//  }
+//  Point(){}
+//};
 struct Castling {
   bool white_o_o : 1;
   bool white_o_o_o : 1;
@@ -107,14 +107,14 @@ struct Castling {
 
 };
 
-using Board = std::array<std::array<Piece, 8>, 8>;
+using Board = std::array<Piece, 64>;
 struct Kings {
-  Point white_king;
-  Point black_king;
-  Point& operator[](const Color& color) {
+  size_t white_king;
+  size_t black_king;
+  size_t& operator[](const Color& color) {
     return color == white ? white_king : black_king;
   };
-  Kings(Point wk, Point bk) : white_king(wk), black_king(bk){};
+  Kings(size_t wk, size_t bk) : white_king(wk), black_king(bk){};
 };
 
  //int g_copied_boards = 0;
@@ -122,54 +122,54 @@ struct Kings {
  //int boards_destroyed = 0;
 
 Board starting_board = {
-    {{{Piece(black, 'R'), Piece(black, 'N'), Piece(black, 'B'),
+    {Piece(black, 'R'), Piece(black, 'N'), Piece(black, 'B'),
        Piece(black, 'Q'), Piece(black, 'K'), Piece(black, 'B'),
-       Piece(black, 'N'), Piece(black, 'R')}},
-     {{Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P'),
+       Piece(black, 'N'), Piece(black, 'R'),
+     Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P'),
        Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P'),
-       Piece(black, 'P'), Piece(black, 'P')}},
-     {{Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(black, 'P'), Piece(black, 'P'),
+     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
        Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' ')}},
-     {{Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' '),
+     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
        Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' ')}},
-     {{Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' '),
+     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
        Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' ')}},
-     {{Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
+       Piece(empty, ' '), Piece(empty, ' '),
+     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
        Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' ')}},
-     {{Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P'),
+       Piece(empty, ' '), Piece(empty, ' '),
+     Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P'),
        Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P'),
-       Piece(white, 'P'), Piece(white, 'P')}},
-     {{Piece(white, 'R'), Piece(white, 'N'), Piece(white, 'B'),
+       Piece(white, 'P'), Piece(white, 'P'),
+     Piece(white, 'R'), Piece(white, 'N'), Piece(white, 'B'),
        Piece(white, 'Q'), Piece(white, 'K'), Piece(white, 'B'),
-       Piece(white, 'N'), Piece(white, 'R')}}}};
+       Piece(white, 'N'), Piece(white, 'R')}};
 
-struct IntPoint {
-  int row;
-  int column;
-  bool Equals(const int& r, const int& c) const {
-    return row == r && column == c;
-  }
-  IntPoint(int r, int c) : row(r), column(c) {}
-  void clear() { row = column = -1; }
-  void Set(int r, int c) {
-    row = r;
-    column = c;
-  };
-  bool operator==(const IntPoint& other) const {
-    return row == other.row && column == other.column;
-  }
-
-  bool operator<(const IntPoint& other) const {
-    if (row < other.row) return true;
-    if (row > other.row) return false;
-    if (column < other.column) return true;
-    return false;
-  }
-};
+//struct IntPoint {
+//  int row;
+//  int column;
+//  bool Equals(const int& r, const int& c) const {
+//    return row == r && column == c;
+//  }
+//  IntPoint(int r, int c) : row(r), column(c) {}
+//  void clear() { row = column = -1; }
+//  void Set(int r, int c) {
+//    row = r;
+//    column = c;
+//  };
+//  bool operator==(const IntPoint& other) const {
+//    return row == other.row && column == other.column;
+//  }
+//
+//  bool operator<(const IntPoint& other) const {
+//    if (row < other.row) return true;
+//    if (row > other.row) return false;
+//    if (column < other.column) return true;
+//    return false;
+//  }
+//};
 
 
 struct Position {
@@ -182,7 +182,7 @@ struct Position {
   int depth;
   Position* previous_move;
   Kings kings;
-  IntPoint en_passant_target;
+  int en_passant_target;
   size_t fifty_move_rule;
 
 
@@ -190,7 +190,7 @@ struct Position {
   Position(bool wtm, int n, double e, Board b,
            Castling c /*, time_t t*/,
            std::vector<Position*>* o,
-           Position* pm, int d, /*Position* bm,*/Kings k, IntPoint ept, size_t fmc)
+           Position* pm, int d, /*Position* bm,*/Kings k, int ept, size_t fmc)
       : white_to_move(wtm),
         number(n),
         evaluation(e),
@@ -213,14 +213,14 @@ struct Position {
   // Possibilities possibilities;
 
   static Position* StartingPosition() {
-    return new Position(true, 0, 0.0, starting_board, Castling(true, true, true, true), nullptr, nullptr, 0, Kings(Point(7, 4), Point(0, 4)), IntPoint(-1, -1), 0);
+    return new Position(true, 0, 0.0, starting_board, Castling(true, true, true, true), nullptr, nullptr, 0, Kings(60, 4), -1, 0);
   }
 
   Position GenerateMovesCopy() {
-    return Position(!white_to_move, number + 1, evaluation, board, castling, nullptr /* outcomes */,
+    return Position(!white_to_move, number + 1, round(evaluation), board, castling, nullptr /* outcomes */,
                     this /* previous_move */, -1 /*depth*/, /*
                     nullptr /* best_move */
-                    /*, */ kings, IntPoint(-1, -1), fifty_move_rule + 1);
+                    /*, */ kings, -1, fifty_move_rule + 1);
   }
   ~Position() {
     // delete all outcomes pointers
@@ -268,8 +268,8 @@ using MovesType = std::vector<Pair>;
 struct Check {
   bool in_check = false;
   bool king_must_move = false;
-  std::map<IntPoint, std::set<Point>> pinned;
-  std::set<Point> block;
+  std::map<size_t, std::set<size_t>> pinned;
+  std::set<size_t> block;
 };
 
 
@@ -277,13 +277,13 @@ void GetCheckInfo(Check& output, Position& position, Color side = empty) {
   if (side == empty) {
     side = position.white_to_move ? white : black;
   }
-  int new_i, new_j;
+  int new_i;
   /*if (!king_present(position)) {
     int i=1;
   }*/
   Color opponent;
-  IntPoint found(-1, -1);
-  std::set<Point> done;
+  int found;
+  std::set<size_t> done;
   output.in_check = false;
   /*if (position.kings[side][1] == -1) {
     for (int i = 0; i < 8; i++) {
@@ -298,77 +298,90 @@ void GetCheckInfo(Check& output, Position& position, Color side = empty) {
       }
     }
   }*/
-  size_t i = (size_t)position.kings[side].row;
-  size_t j = (size_t)position.kings[side].column;
+  size_t i = (size_t)position.kings[side];
   // pawn check
   if (side == white) {
     opponent = black;
-    new_i = (int)i - 1;
+    // right check
+    if (i > 7 && ((i & 7) != 7)) {
+      new_i = (int)i - 7;
+      if (position.board[(size_t)new_i].color == opponent &&
+          position.board[(size_t)new_i].type == 'P') {
+        output.in_check = true;
+        output.block.insert((size_t)new_i);
+      }
+    }
+    // left check
+    if (i > 8 && (i & 7) != 0) {
+      new_i = (int)i - 9;
+      if (position.board[(size_t)new_i].color == opponent &&
+          position.board[(size_t)new_i].type == 'P') {
+        output.in_check = true;
+        output.block.insert((size_t)new_i);
+      }
+    }
   } else {
     opponent = white;
-    new_i = (int)i + 1;
-  }
-  // right
-  new_j = (int)j + 1;
-  if (new_i >= 0 && new_i <= 7 && j < 7 && position.board[(size_t)new_i][j + 1].color == opponent &&
-        position.board[(size_t)new_i][j + 1].type == 'P') {
-    output.in_check = true;
-    output.block.insert(Point((size_t)new_i, (size_t)new_j));
-  }
-  // left
-  new_j = (int)j - 1;
-  if (new_i >= 0 && new_i <= 7 && j > 0 && position.board[(size_t)new_i][(size_t)new_j].color == opponent &&
-      position.board[(size_t)new_i][(size_t)new_j].type == 'P') {
-    if (output.in_check) {
-      output.king_must_move = true;
-    } else {
-      output.in_check = true;
-      output.block.insert(Point((size_t)new_i, (size_t)new_j));
+    // right check
+    if (i < 55 && ((i & 7) != 7)) {
+      new_i = (int)i + 9;
+      if (position.board[(size_t)new_i].color == opponent &&
+          position.board[(size_t)new_i].type == 'P') {
+        output.in_check = true;
+        output.block.insert((size_t)new_i);
+      }
+    }
+    // left check
+    if (i < 56 && (i & 7) != 0) {
+      new_i = (int)i + 7;
+      if (position.board[(size_t)new_i].color == opponent &&
+          position.board[(size_t)new_i].type == 'P') {
+        output.in_check = true;
+        output.block.insert((size_t)new_i);
+      }
     }
   }
 
   // knight check
   for (size_t k = 0; k < 8; k++) {
-    new_i = (int)i + knight_moves[k][0];
-    if (new_i >= 0 && new_i <= 7) {
-      new_j = (int)j + knight_moves[k][1];
-      if (new_j >= 0 && new_j <= 7 &&
-          position.board[(size_t)new_i][(size_t)new_j].color == opponent &&
-          position.board[(size_t)new_i][(size_t)new_j].type == 'N') {
+    new_i = (int)i + knight_moves[k];
+    if (new_i >= 0 && new_i <= 63) {
+      if (position.board[(size_t)new_i].type ==
+              'N'&&
+          position.board[(size_t)new_i].color == opponent          ) {
         if (output.in_check) {
           output.king_must_move = true;
         } else {
           output.in_check = true;
-          output.block.insert(Point((size_t)new_i, (size_t)new_j));
+          output.block.insert((size_t)new_i);
         }
       }
     }
   }
   // bishop check
   for (size_t k = 0; k < 4; k++) {
-    found.row = -1;
-    found.column = -1;
+    found = -1;
     done.clear();
-    new_i = (int)i + bishop_moves[k][0];
-    new_j = (int)j + bishop_moves[k][1];
-
-    while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-      done.insert(Point((size_t)new_i, (size_t)new_j));
-      if (position.board[(size_t)new_i][(size_t)new_j].color == side) {
-        if (found.row != -1) {
+    new_i = (int)i + bishop_moves[k];
+    if (((new_i & 7) - ((int)i & 7)) > 1 || ((new_i & 7) - ((int)i & 7)) < -1 ||
+        new_i > 63 || new_i < 0) {
+      continue;
+    }
+    while (true) {
+      done.insert((size_t)new_i);
+      if (position.board[(size_t)new_i].color == side) {
+        if (found != -1) {
           break;
         }
-        found.row = new_i;
-        found.column = new_j;
-
-      } else if (position.board[(size_t)new_i][(size_t)new_j].color == opponent) {
-        if (position.board[(size_t)new_i][(size_t)new_j].type == 'B' ||
-            position.board[(size_t)new_i][(size_t)new_j].type == 'Q') {
-          if (found.row != -1) {
+        found = new_i;
+      } else if (position.board[(size_t)new_i].color == opponent) {
+        if (position.board[(size_t)new_i].type == 'B' ||
+            position.board[(size_t)new_i].type == 'Q') {
+          if (found != -1) {
             //if (position.board[found.row][found.column].type == 'B' ||
             //    position.board[found.row][found.column].type == 'Q' /*need to account for pawns too*/) {
               // (position.board[(size_t)new_i][(size_t)new_j].type != 'Q' ? (position.board[found.row][found.column].type != position.board[(size_t)new_i][(size_t)new_j].type || (position.board[found.row][found.column].type == 'Q' && (position.board[(size_t)new_i][(size_t)new_j].type == 'B' || position.board[(size_t)new_i][(size_t)new_j].type == 'R'))) : (position.board[found.row][found.column].type == 'B' || position.board[found.row][found.column].type == 'R')
-              output.pinned[found] = done;
+              output.pinned[(size_t)found] = done;
             //} else {
             //  output.pinned[found];
             //}
@@ -384,53 +397,39 @@ void GetCheckInfo(Check& output, Position& position, Color side = empty) {
         }
         break;
       }
-      new_i += bishop_moves[k][0];
-      new_j += bishop_moves[k][1];
+      if (new_i <= 8 || new_i >= 55 || (new_i & 7) == 7 || (new_i & 7) == 0) {
+        break;
+      }
+      new_i += bishop_moves[k];
     }
   }
   // rook check
 
 
   for (size_t k = 0; k < 4; k++) {
-    found.row = -1;
-    found.column = -1;
+    found = -1;
     done.clear();
-    new_i = (int)i + rook_moves[k][0];
-    new_j = (int)j + rook_moves[k][1];
-
-    while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-      done.insert(Point((size_t)new_i, (size_t)new_j));
-      if (position.board[(size_t)new_i][(size_t)new_j].color ==
-          position.board[i][j].color) {
-        if (found.row != -1) {
+    new_i = (int)i + rook_moves[k];
+    if ((((new_i & 7) != ((int)i & 7)) &&
+         ((new_i >> 3) != ((int)i >> 3))) ||
+        new_i > 63 || new_i < 0) {
+      continue;
+    }
+    while (true) {
+      done.insert((size_t)new_i);
+      if (position.board[(size_t)new_i].color ==
+          side) {
+        if (found != -1) {
           break;
         }
-        found.row = new_i;
-        found.column = new_j;
+        found = new_i;
 
-      } else if (position.board[(size_t)new_i][(size_t)new_j].color ==
+      } else if (position.board[(size_t)new_i].color ==
                  opponent) {
-        if (position.board[(size_t)new_i][(size_t)new_j].type == 'R' ||
-            position.board[(size_t)new_i][(size_t)new_j].type == 'Q') {
-          if (found.row != -1) {
-            if (position.board[(size_t)found.row][(size_t)found.column].type ==
-                    'R' ||
-                position.board[(size_t)found.row][(size_t)found.column].type ==
-                    'Q' ||
-                position.board[(size_t)found.row][(size_t)found.column].type ==
-                    'P') {
-              // (position.board[(size_t)new_i][(size_t)new_j].type != 'Q' ?
-              // (position.board[found.row][found.column].type !=
-              // position.board[(size_t)new_i][(size_t)new_j].type ||
-              // (position.board[found.row][found.column].type == 'Q' &&
-              // (position.board[(size_t)new_i][(size_t)new_j].type == 'B' ||
-              // position.board[(size_t)new_i][(size_t)new_j].type == 'R'))) :
-              // (position.board[found.row][found.column].type == 'B' ||
-              // position.board[found.row][found.column].type == 'R')
-              output.pinned[found] = done;
-            } else {
-              output.pinned[found];
-            }
+        if (position.board[(size_t)new_i].type == 'R' ||
+            position.board[(size_t)new_i].type == 'Q') {
+          if (found != -1) {
+            output.pinned[(size_t)found] = done;
           } else {
             if (output.in_check) {
               output.king_must_move = true;
@@ -442,824 +441,836 @@ void GetCheckInfo(Check& output, Position& position, Color side = empty) {
         }
         break;
       }
-      new_i += rook_moves[k][0];
-      new_j += rook_moves[k][1];
-    }
-  }
-}
-
-bool MoveOk(Check check, size_t i, size_t j, size_t new_i, size_t new_j) {
-  IntPoint origin = IntPoint((int)i, (int)j);
-  Point dest = Point(new_i, new_j);
-  return ((check.in_check ? check.block.count(dest)
-          : true) && (check.pinned.contains(origin)
-              ? check.pinned[origin].contains(dest)
-              : true));
-}
-bool InCheck(Position& position, const Color& side, int ki = -1, int kj = -1) {
-  int new_i, new_j;
-  /*if (!king_present(position)) {
-    int i=1;
-  }*/
-  Color opponent = side == white ? black : white;
-  /*if (position.kings[side][1] == -1) {
-    for (int i = 0; i < 8; i++) {
-      for (int j = 0; j < 8; j++) {
-        if (position.board[i][j][0] == side &&
-            position.board[i][j][1] == 'K') {
-          position.kings[side][0] = i;
-          position.kings[side][1] = j;
-          i = 8;
+      if (k == 0) {
+        if (new_i <= 7) {
+          break;
+        }
+      } else if (k == 1) {
+        if ((new_i & 7) == 7) {
+          break;
+        }
+      } else if (k == 2) {
+        if (new_i >= 56) {
+          break;
+        }
+      } else {
+        if ((new_i & 7) == 0) {
           break;
         }
       }
-    }
-  }*/
-  size_t i = ki == -1 ? position.kings[side].row : (size_t)ki;
-  size_t j = kj == -1 ? position.kings[side].column : (size_t)kj;
-  // pawn check
-  new_i = (int)i + (side == white ? -1 : 1);
-  if (new_i >= 0 && new_i <= 7 &&
-      ((j < 7 && position.board[(size_t)new_i][j + 1].color == opponent &&
-        position.board[(size_t)new_i][j + 1].type == 'P') ||
-       (j > 0 && position.board[(size_t)new_i][j - 1].color == opponent &&
-        position.board[(size_t)new_i][j - 1].type == 'P'))) {
-    return true;
-  }
-
-  // knight check
-  for (size_t k = 0; k < 8; k++) {
-    new_i = (int)i + knight_moves[k][0];
-    if (new_i >= 0 && new_i <= 7) {
-      new_j = (int)j + knight_moves[k][1];
-      if (new_j >= 0 && new_j <= 7 &&
-          position.board[(size_t)new_i][(size_t)new_j].color == opponent &&
-          position.board[(size_t)new_i][(size_t)new_j].type == 'N') {
-        return true;
-      }
+      new_i += rook_moves[k];
     }
   }
-  // bishop check
-  for (size_t k = 0; k < 4; k++) {
-    new_i = (int)i + bishop_moves[k][0];
-    new_j = (int)j + bishop_moves[k][1];
-
-    while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-      if (position.board[(size_t)new_i][(size_t)new_j].color == side &&
-          position.board[(size_t)new_i][(size_t)new_j].type != 'K') {
-        break;
-      }
-
-      if (position.board[(size_t)new_i][(size_t)new_j].color == opponent) {
-        if (position.board[(size_t)new_i][(size_t)new_j].type == 'B' ||
-            position.board[(size_t)new_i][(size_t)new_j].type == 'Q') {
-          return true;
-        }
-        break;
-      }
-      new_i += bishop_moves[k][0];
-      new_j += bishop_moves[k][1];
-    }
-  }
-  // rook check
-  // left
-  for (new_j = (int)j - 1; new_j >= 0; new_j--) {
-    if (position.board[i][(size_t)new_j].color == opponent) {
-      if ((position.board[i][(size_t)new_j].type == 'R' ||
-           position.board[i][(size_t)new_j].type == 'Q')) {
-        return true;
-      }
-      break;
-    }
-    if (position.board[i][(size_t)new_j].color == side &&
-        position.board[i][(size_t)new_j].type != 'K') {
-      break;
-    }
-  }
-
-  // up
-  for (new_i = (int)i - 1; new_i >= 0; new_i--) {
-    if (position.board[(size_t)new_i][j].color == opponent) {
-      if ((position.board[(size_t)new_i][j].type == 'R' ||
-           position.board[(size_t)new_i][j].type == 'Q')) {
-        return true;
-      }
-      break;
-    }
-    if (position.board[(size_t)new_i][j].color == side &&
-        position.board[(size_t)new_i][j].type != 'K') {
-      break;
-    }
-  }
-
-  // right
-  for (new_j = (int)j + 1; new_j <= 7; new_j++) {
-    if (position.board[i][(size_t)new_j].color == opponent) {
-      if ((position.board[i][(size_t)new_j].type == 'R' ||
-           position.board[i][(size_t)new_j].type == 'Q')) {
-        return true;
-      }
-      break;
-    }
-    if (position.board[i][(size_t)new_j].color == side &&
-        position.board[i][(size_t)new_j].type != 'K') {
-      break;
-    }
-  }
-
-  // down
-  for (new_i = (int)i + 1; new_i <= 7; new_i++) {
-    if (position.board[(size_t)new_i][j].color == opponent) {
-      if ((position.board[(size_t)new_i][j].type == 'R' ||
-           position.board[(size_t)new_i][j].type == 'Q')) {
-        return true;
-      }
-      break;
-    }
-    if (position.board[(size_t)new_i][j].color == side &&
-        position.board[(size_t)new_i][j].type != 'K') {
-      break;
-    }
-  }
-  // king check
-  for (size_t k = 0; k < 8; k++) {
-    new_i = (int)i + king_moves[k][0];
-    new_j = (int)j + king_moves[k][1];
-    if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
-        position.board[(size_t)new_i][(size_t)new_j].type == 'K' &&
-        position.board[(size_t)new_i][(size_t)new_j].color == opponent) {
-      return true;
-    }
-
-  }
-  return false;
 }
+
+bool MoveOk(Check check, size_t i, size_t new_i) {
+  return ((check.in_check ? check.block.count(new_i)
+          : true) && (check.pinned.contains(i)
+              ? check.pinned[i].contains(new_i)
+              : true));
+}
+
+
+bool InCheck(Position& position, const Color& side, int ki = -1) {
+    int new_i;
+    /*if (!king_present(position)) {
+      int i=1;
+    }*/
+    Color opponent;
+    /*if (position.kings[side][1] == -1) {
+      for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+          if (position.board[i][j][0] == side &&
+              position.board[i][j][1] == 'K') {
+            position.kings[side][0] = i;
+            position.kings[side][1] = j;
+            i = 8;
+            break;
+          }
+        }
+      }
+    }*/
+    size_t i;
+    if (ki == -1) {
+    i = (size_t)position.kings[side];
+    } else {
+    i = (size_t)ki;
+    }
+    // pawn check
+    if (side == white) {
+      opponent = black;
+      // right check
+      if (i > 7 && ((i & 7) != 7)) {
+        new_i = (int)i - 7;
+        if (position.board[(size_t)new_i].color == opponent &&
+            position.board[(size_t)new_i].type == 'P') {
+        return true;
+        }
+      }
+      // left check
+      if (i > 8 && (i & 7) != 0) {
+        new_i = (int)i - 9;
+        if (position.board[(size_t)new_i].color == opponent &&
+            position.board[(size_t)new_i].type == 'P') {
+        return true;
+        }
+      }
+    } else {
+      opponent = white;
+      // right check
+      if (i < 55 && ((i & 7) != 7)) {
+        new_i = (int)i + 9;
+        if (position.board[(size_t)new_i].color == opponent &&
+            position.board[(size_t)new_i].type == 'P') {
+        return true;
+        }
+      }
+      // left check
+      if (i < 56 && (i & 7) != 0) {
+        new_i = (int)i + 7;
+        if (position.board[(size_t)new_i].color == opponent &&
+            position.board[(size_t)new_i].type == 'P') {
+        return true;
+        }
+      }
+    }
+
+    // knight check
+    for (size_t k = 0; k < 8; k++) {
+      new_i = (int)i + knight_moves[k];
+      if (new_i >= 0 && new_i <= 63) {
+        if (position.board[(size_t)new_i].type == 'N' &&
+            position.board[(size_t)new_i].color == opponent) {
+        return true;
+        }
+      }
+    }
+    // bishop check
+    for (size_t k = 0; k < 4; k++) {
+      new_i = (int)i + bishop_moves[k];
+      if (((new_i & 7) - ((int)i & 7)) > 1 ||
+          ((new_i & 7) - ((int)i & 7)) < -1 || new_i > 63 || new_i < 0) {
+        continue;
+      }
+      while (true) {
+        if (position.board[(size_t)new_i].color == side) {
+        break;
+        } else if (position.board[(size_t)new_i].color == opponent) {
+          if (position.board[(size_t)new_i].type == 'B' ||
+              position.board[(size_t)new_i].type == 'Q') {
+          return true;
+          }
+        }
+        if (new_i <= 8 || new_i >= 55 || (new_i & 7) == 7 || (new_i & 7) == 0) {
+          break;
+        }
+        new_i += bishop_moves[k];
+      }
+    }
+    // rook check
+
+    for (size_t k = 0; k < 4; k++) {
+      new_i = (int)i + rook_moves[k];
+      if ((((new_i & 7) != ((int)i & 7)) && ((new_i >> 3) != ((int)i >> 3))) ||
+          new_i > 63 || new_i < 0) {
+        continue;
+      }
+      while (true) {
+        if (position.board[(size_t)new_i].color == side) {
+          break;
+        } else if (position.board[(size_t)new_i].color == opponent) {
+          if (position.board[(size_t)new_i].type == 'R' ||
+              position.board[(size_t)new_i].type == 'Q') {
+          return true;
+          }
+        }
+        if (k == 0) {
+          if (new_i <= 7) {
+          break;
+          }
+        } else if (k == 1) {
+          if ((new_i & 7) == 7) {
+          break;
+          }
+        } else if (k == 2) {
+          if (new_i >= 56) {
+          break;
+          }
+        } else {
+          if ((new_i & 7) == 0) {
+          break;
+          }
+        }
+        new_i += rook_moves[k];
+      }
+    }
+    return false;
+}
+
 
 
 const int king_value = 1000;
 
 
-double EvaluateMobility(Position& position) {
-  Color opponent;
-  Check white_check;
-  Check black_check;
-  GetCheckInfo(white_check, position);
-  GetCheckInfo(black_check, position);
-  int new_i, new_j;
-  double mobility_score = 0;
-  Check* check;
-
-  for (size_t i = 0; i <= 7; i++) {
-    for (size_t j = 0; j <= 7; j++) {
-      if (position.board[i][j].color == empty) {
+//double EvaluateMobility(Position& position) {
+//  Color opponent;
+//  Check white_check;
+//  Check black_check;
+//  GetCheckInfo(white_check, position);
+//  GetCheckInfo(black_check, position);
+//  int new_i, new_j;
+//  double mobility_score = 0;
+//  Check* check;
+//
+//  for (size_t i = 0; i <= 7; i++) {
+//      if (position.board[i].color == empty) {
+//        continue;
+//      }
+//      double moves = 0;
+//      if (position.board[i].type == 'K') {
+//        for (size_t k = 0; k < 8; k++) {
+//          new_i = (int)i + king_moves[k][0];
+//          new_j = (int)j + king_moves[k][1];
+//          if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 && !InCheck(position, position.board[i][j].color, new_i, new_j)) {
+//            moves++;
+//          }
+//        }
+//        mobility_score += (double)moves / (double)king_value;
+//        continue;
+//      }
+//      if (position.board[i].color == white) {
+//        check = &white_check;
+//      } else {
+//        check = &black_check;
+//      }
+//      // counting moves
+//      //int addition = position.board[i][j].color == 'W' ? 1 : -1;
+//      opponent = position.board[i].color == white ? black : white;
+//      switch (position.board[i].type) {
+//        case 'P': {
+//          if (check->king_must_move) {
+//            break;
+//          }
+//          int multiplier;
+//          size_t promotion_row, starting_row, jump_row;
+//          if (position.board[i].color == white) {
+//            multiplier = -1;
+//            starting_row = 6;
+//            jump_row = 4;
+//            promotion_row = 1;
+//          } else {
+//            multiplier = 1;
+//            starting_row = 1;
+//            jump_row = 3;
+//            promotion_row = 6;
+//          }
+//          bool left_capture =
+//              j > 0 && position.board[i + multiplier][j - 1].color == opponent;
+//          bool right_capture =
+//              j < 7 && position.board[i + multiplier][j + 1].color == opponent;
+//          new_i = (int)i + multiplier;
+//          if (i == promotion_row) {
+//            // promotion
+//            // one square
+//
+//            if (position.board[(size_t)new_i][j].color == empty) {
+//              if (MoveOk(*check, i, j, (size_t)new_i, j)) {
+//                moves += 2;
+//              }
+//            }
+//            // captures to the left
+//            if (left_capture && MoveOk(*check, i, j, (size_t)new_i, j - 1)) {
+//              moves += 4;
+//            }
+//            // captures to the right
+//            if (right_capture && MoveOk(*check, i, j, (size_t)new_i, j + 1)) {
+//              moves += 4;
+//            }
+//          } else if (position.board[(size_t)new_i][j].color == empty) {
+//            // one square forward
+//            if (MoveOk(*check, i, j, (size_t)new_i, j)) {
+//              moves += 0.5;
+//            }
+//            // two squares forward
+//            if (i == starting_row &&
+//                position.board[i + multiplier][j].color == empty && 
+//                position.board[jump_row][j].color == empty &&
+//                MoveOk(*check, i, j, jump_row, j)) {
+//              moves += 0.5;
+//            }
+//          } else {
+//            if (left_capture && MoveOk(*check, i, j, (size_t)new_i, j - 1)) {
+//              moves++;
+//            }
+//            // captures to the right
+//            if (left_capture && MoveOk(*check, i, j, (size_t)new_i, j + 1)) {
+//              moves++;
+//            }
+//            // en passant to the left
+//            size_t en_passant_start = jump_row + multiplier;
+//            if (i == en_passant_start && j > 0 &&
+//                position.board[i][j - 1].color == opponent &&
+//                position.board[i][j - 1].type == 'P' &&
+//                position.en_passant_target.Equals(new_i, (int)j - 1) &&
+//                MoveOk(*check, i, j, (size_t)new_i, j - 1)) {
+//              int di = (int)position.kings[position.board[i][j].color].row - (int)i;
+//              int dj =
+//                  (int)position.kings[position.board[i][j].color].column - (int)j - 1;
+//              bool good = true;
+//              if (position.kings[position.board[i][j].color].row == i) {
+//                if (position.kings[position.board[i][j].color].column > j) {
+//                  int iter_j =
+//                      (int)position.kings[position.board[i][j].color].column;
+//                  while (iter_j >= 0) {
+//                    if (position.board[i][(size_t)iter_j].color ==
+//                        position.board[i][j].color) {
+//                      break;
+//                    }
+//                    if (position.board[i][(size_t)iter_j].color == opponent) {
+//                      if (position.board[i][(size_t)iter_j].type == 'R' ||
+//                          position.board[i][(size_t)iter_j].type == 'Q') {
+//                        good = false;
+//                        break;
+//                      }
+//                    }
+//                    iter_j--;
+//                  }
+//                } else {
+//                  int iter_j =
+//                      (int)position.kings[position.board[i][j].color].column;
+//                  while (iter_j <= 7) {
+//                    if (position.board[i][(size_t)iter_j].color ==
+//                        position.board[i][j].color) {
+//                      break;
+//                    }
+//                    if (position.board[i][(size_t)iter_j].color == opponent) {
+//                      if (position.board[i][(size_t)iter_j].type == 'R' ||
+//                          position.board[i][(size_t)iter_j].type == 'Q') {
+//                        good = false;
+//                      }
+//                      break;
+//                    }
+//                    iter_j++;
+//                  }
+//                }
+//              }
+//              if (good && std::abs(di) == std::abs(dj)) {
+//                di = di > 0 ? 1 : -1;
+//                dj = dj > 0 ? 1 : -1;
+//                int iter_i = (int)i;
+//                int iter_j = (int)j;
+//
+//                while (iter_i >= 0 && iter_i <= 7 && iter_j >= 0 &&
+//                       iter_j <= 7) {
+//                  if (position.board[(size_t)iter_i][(size_t)iter_j].color ==
+//                      position.board[i][j].color) {
+//                    break;
+//
+//                  } else if (position.board[(size_t)iter_i][(size_t)iter_j].color == opponent) {
+//                    if (position.board[(size_t)iter_i][(size_t)iter_j].type == 'B' ||
+//                        position.board[(size_t)iter_i][(size_t)iter_j].type == 'Q') {
+//                      good = false;
+//                    }
+//                    break;
+//                  }
+//                  iter_i += di;
+//                  iter_j += dj;
+//                }
+//              }
+//              if (good) {
+//                moves++;
+//              }
+//            }
+//            // en passant to the right
+//            if (i == en_passant_start && j < 7 &&
+//                position.board[i][j + 1].color == opponent &&
+//                position.board[i][j + 1].type == 'P' &&
+//                position.en_passant_target.Equals(new_i, (int)j + 1) &&
+//                MoveOk(*check, i, j, (size_t)new_i, j + 1)) {
+//              int di = (int)position.kings[position.board[i][j].color].row - (int)i;
+//              int dj = (int)position.kings[position.board[i][j].color].column -
+//                       (int)j + 1;
+//              bool good = true;
+//              if (position.kings[position.board[i][j].color].row == i) {
+//                if (position.kings[position.board[i][j].color].column > j) {
+//                  int iter_j =
+//                      (int)position.kings[position.board[i][j].color].column;
+//                  while (iter_j >= 0) {
+//                    if (position.board[i][(size_t)iter_j].color ==
+//                        position.board[i][j].color) {
+//                      break;
+//                    }
+//                    if (position.board[i][(size_t)iter_j].color == opponent) {
+//                      if (position.board[i][(size_t)iter_j].type == 'R' ||
+//                          position.board[i][(size_t)iter_j].type == 'Q') {
+//                        good = false;
+//                        break;
+//                      }
+//                    }
+//                    iter_j--;
+//                  }
+//                } else {
+//                  int iter_j =
+//                      (int)position.kings[position.board[i][j].color].column;
+//                  while (iter_j <= 7) {
+//                    if (position.board[i][(size_t)iter_j].color ==
+//                        position.board[i][j].color) {
+//                      break;
+//                    }
+//                    if (position.board[i][(size_t)iter_j].color == opponent) {
+//                      if (position.board[i][(size_t)iter_j].type == 'R' ||
+//                          position.board[i][(size_t)iter_j].type == 'Q') {
+//                        good = false;
+//                      }
+//                      break;
+//                    }
+//                    iter_j++;
+//                  }
+//                }
+//              }
+//              if (good && std::abs(di) == std::abs(dj)) {
+//                di = di > 0 ? 1 : -1;
+//                dj = dj > 0 ? 1 : -1;
+//                int iter_i = (int)i;
+//                int iter_j = (int)j;
+//
+//                while (iter_i >= 0 && iter_i <= 7 && iter_j >= 0 &&
+//                       iter_j <= 7) {
+//                  if (position.board[(size_t)iter_i][(size_t)iter_j].color ==
+//                      position.board[i][j].color) {
+//                    break;
+//
+//                  } else if (position.board[(size_t)iter_i][(size_t)iter_j].color == opponent) {
+//                    if (position.board[(size_t)iter_i][(size_t)iter_j].type == 'B' ||
+//                        position.board[(size_t)iter_i][(size_t)iter_j].type == 'Q') {
+//                      good = false;
+//                    }
+//                    break;
+//                  }
+//                  iter_i += di;
+//                  iter_j += dj;
+//                }
+//              }
+//              if (good) {
+//                moves++;
+//              }
+//            }
+//          }
+//          break;
+//        }
+//        case 'N':
+//          if (check->king_must_move) {
+//            break;
+//          }
+//          for (size_t k = 0; k < 8; k++) {
+//            new_i = (int)i + knight_moves[k][0];
+//            new_j = (int)j + knight_moves[k][1];
+//            if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
+//                position.board[(size_t)new_i][(size_t)new_j].color !=
+//                    position.board[i][j].color) {
+//              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
+//                moves++;
+//              }
+//            }
+//          }
+//          break;
+//        case 'Q':
+//        case 'B':
+//          if (check->king_must_move) {
+//            break;
+//          }
+//          for (size_t k = 0; k < 4; k++) {
+//            new_i = (int)i + bishop_moves[k][0];
+//            new_j = (int)j + bishop_moves[k][1];
+//
+//            while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
+//              if (position.board[(size_t)new_i][(size_t)new_j].color ==
+//                  position.board[i][j].color) {
+//                break;
+//              }
+//              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
+//                moves++;
+//              }
+//              if (position.board[(size_t)new_i][(size_t)new_j].color == opponent) {
+//                break;
+//              }
+//              new_i += bishop_moves[k][0];
+//              new_j += bishop_moves[k][1];
+//            }
+//          }
+//          if (position.board[i][j].type == 'B') {
+//            break;
+//          }
+//        case 'R':
+//          if (check->king_must_move) {
+//            break;
+//          }
+//          for (size_t k = 0; k < 4; k++) {
+//            new_i = (int)i + rook_moves[k][0];
+//            new_j = (int)j + rook_moves[k][1];
+//            while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
+//              if (position.board[(size_t)new_i][(size_t)new_j].color ==
+//                  position.board[i][j].color) {
+//                break;
+//              }
+//              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
+//                moves++;
+//              }
+//              if (position.board[(size_t)new_i][(size_t)new_j].color == opponent) {
+//                break;
+//              }
+//              new_i = new_i + rook_moves[k][0];
+//              new_j = new_j + rook_moves[k][1];
+//            }
+//          }
+//          break;
+//
+//      }
+//
+//      if (position.board[i][j].color == white) {
+//        mobility_score +=
+//            ((double)moves / piece_values[position.board[i][j].type]);
+//      } else {
+//        mobility_score -=
+//            ((double)moves / piece_values[position.board[i][j].type]);
+//      }
+//    }
+//  }
+//
+//  return mobility_score / 1000.0;
+//}
+bool CheckEnPassantRights(Position& position, size_t i, int new_i, int target, Color& opponent) {
+    size_t king_i = position.kings[position.board[i].color];
+    int iter_i;
+    assert(i <= 63);
+    for (size_t k = 0; k < 4; k++) {
+      iter_i = (int)king_i + bishop_moves[k];
+      if (((iter_i & 7) - ((int)king_i & 7)) > 1 ||
+          ((iter_i & 7) - ((int)king_i & 7)) < -1 || iter_i > 63 ||
+          iter_i < 0) {
         continue;
       }
-      double moves = 0;
-      if (position.board[i][j].type == 'K') {
-        for (size_t k = 0; k < 8; k++) {
-          new_i = (int)i + king_moves[k][0];
-          new_j = (int)j + king_moves[k][1];
-          if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 && !InCheck(position, position.board[i][j].color, new_i, new_j)) {
-            moves++;
+      while (true) {
+        if ((size_t)iter_i == i || (size_t)iter_i == (i + 1)) {
+          iter_i += bishop_moves[k];
+          continue;
+        }
+        if (position.board[(size_t)iter_i].color ==
+                position.board[king_i].color ||
+            iter_i == target) {
+          break;
+        } else if (position.board[(size_t)iter_i].color == opponent) {
+          if (position.board[(size_t)iter_i].type == 'B' ||
+              position.board[(size_t)iter_i].type == 'Q') {
+          return false;
           }
         }
-        mobility_score += (double)moves / (double)king_value;
-        continue;
-      }
-      if (position.board[i][j].color == white) {
-        check = &white_check;
-      } else {
-        check = &black_check;
-      }
-      // counting moves
-      //int addition = position.board[i][j].color == 'W' ? 1 : -1;
-      opponent = position.board[i][j].color == white ? black : white;
-      switch (position.board[i][j].type) {
-        case 'P': {
-          if (check->king_must_move) {
-            break;
-          }
-          int multiplier;
-          size_t promotion_row, starting_row, jump_row;
-          if (position.board[i][j].color == white) {
-            multiplier = -1;
-            starting_row = 6;
-            jump_row = 4;
-            promotion_row = 1;
-          } else {
-            multiplier = 1;
-            starting_row = 1;
-            jump_row = 3;
-            promotion_row = 6;
-          }
-          bool left_capture =
-              j > 0 && position.board[i + multiplier][j - 1].color == opponent;
-          bool right_capture =
-              j < 7 && position.board[i + multiplier][j + 1].color == opponent;
-          new_i = (int)i + multiplier;
-          if (i == promotion_row) {
-            // promotion
-            // one square
-
-            if (position.board[(size_t)new_i][j].color == empty) {
-              if (MoveOk(*check, i, j, (size_t)new_i, j)) {
-                moves += 2;
-              }
-            }
-            // captures to the left
-            if (left_capture && MoveOk(*check, i, j, (size_t)new_i, j - 1)) {
-              moves += 4;
-            }
-            // captures to the right
-            if (right_capture && MoveOk(*check, i, j, (size_t)new_i, j + 1)) {
-              moves += 4;
-            }
-          } else if (position.board[(size_t)new_i][j].color == empty) {
-            // one square forward
-            if (MoveOk(*check, i, j, (size_t)new_i, j)) {
-              moves += 0.5;
-            }
-            // two squares forward
-            if (i == starting_row &&
-                position.board[i + multiplier][j].color == empty && 
-                position.board[jump_row][j].color == empty &&
-                MoveOk(*check, i, j, jump_row, j)) {
-              moves += 0.5;
-            }
-          } else {
-            if (left_capture && MoveOk(*check, i, j, (size_t)new_i, j - 1)) {
-              moves++;
-            }
-            // captures to the right
-            if (left_capture && MoveOk(*check, i, j, (size_t)new_i, j + 1)) {
-              moves++;
-            }
-            // en passant to the left
-            size_t en_passant_start = jump_row + multiplier;
-            if (i == en_passant_start && j > 0 &&
-                position.board[i][j - 1].color == opponent &&
-                position.board[i][j - 1].type == 'P' &&
-                position.en_passant_target.Equals(new_i, (int)j - 1) &&
-                MoveOk(*check, i, j, (size_t)new_i, j - 1)) {
-              int di = (int)position.kings[position.board[i][j].color].row - (int)i;
-              int dj =
-                  (int)position.kings[position.board[i][j].color].column - (int)j - 1;
-              bool good = true;
-              if (position.kings[position.board[i][j].color].row == i) {
-                if (position.kings[position.board[i][j].color].column > j) {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j >= 0) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                        break;
-                      }
-                    }
-                    iter_j--;
-                  }
-                } else {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j <= 7) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                      }
-                      break;
-                    }
-                    iter_j++;
-                  }
-                }
-              }
-              if (good && std::abs(di) == std::abs(dj)) {
-                di = di > 0 ? 1 : -1;
-                dj = dj > 0 ? 1 : -1;
-                int iter_i = (int)i;
-                int iter_j = (int)j;
-
-                while (iter_i >= 0 && iter_i <= 7 && iter_j >= 0 &&
-                       iter_j <= 7) {
-                  if (position.board[(size_t)iter_i][(size_t)iter_j].color ==
-                      position.board[i][j].color) {
-                    break;
-
-                  } else if (position.board[(size_t)iter_i][(size_t)iter_j].color == opponent) {
-                    if (position.board[(size_t)iter_i][(size_t)iter_j].type == 'B' ||
-                        position.board[(size_t)iter_i][(size_t)iter_j].type == 'Q') {
-                      good = false;
-                    }
-                    break;
-                  }
-                  iter_i += di;
-                  iter_j += dj;
-                }
-              }
-              if (good) {
-                moves++;
-              }
-            }
-            // en passant to the right
-            if (i == en_passant_start && j < 7 &&
-                position.board[i][j + 1].color == opponent &&
-                position.board[i][j + 1].type == 'P' &&
-                position.en_passant_target.Equals(new_i, (int)j + 1) &&
-                MoveOk(*check, i, j, (size_t)new_i, j + 1)) {
-              int di = (int)position.kings[position.board[i][j].color].row - (int)i;
-              int dj = (int)position.kings[position.board[i][j].color].column -
-                       (int)j + 1;
-              bool good = true;
-              if (position.kings[position.board[i][j].color].row == i) {
-                if (position.kings[position.board[i][j].color].column > j) {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j >= 0) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                        break;
-                      }
-                    }
-                    iter_j--;
-                  }
-                } else {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j <= 7) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                      }
-                      break;
-                    }
-                    iter_j++;
-                  }
-                }
-              }
-              if (good && std::abs(di) == std::abs(dj)) {
-                di = di > 0 ? 1 : -1;
-                dj = dj > 0 ? 1 : -1;
-                int iter_i = (int)i;
-                int iter_j = (int)j;
-
-                while (iter_i >= 0 && iter_i <= 7 && iter_j >= 0 &&
-                       iter_j <= 7) {
-                  if (position.board[(size_t)iter_i][(size_t)iter_j].color ==
-                      position.board[i][j].color) {
-                    break;
-
-                  } else if (position.board[(size_t)iter_i][(size_t)iter_j].color == opponent) {
-                    if (position.board[(size_t)iter_i][(size_t)iter_j].type == 'B' ||
-                        position.board[(size_t)iter_i][(size_t)iter_j].type == 'Q') {
-                      good = false;
-                    }
-                    break;
-                  }
-                  iter_i += di;
-                  iter_j += dj;
-                }
-              }
-              if (good) {
-                moves++;
-              }
-            }
-          }
+        if (iter_i <= 8 || iter_i >= 55 || (iter_i & 7) == 7 ||
+            (iter_i & 7) == 0) {
           break;
         }
-        case 'N':
-          if (check->king_must_move) {
-            break;
-          }
-          for (size_t k = 0; k < 8; k++) {
-            new_i = (int)i + knight_moves[k][0];
-            new_j = (int)j + knight_moves[k][1];
-            if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
-                position.board[(size_t)new_i][(size_t)new_j].color !=
-                    position.board[i][j].color) {
-              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
-                moves++;
-              }
-            }
-          }
-          break;
-        case 'Q':
-        case 'B':
-          if (check->king_must_move) {
-            break;
-          }
-          for (size_t k = 0; k < 4; k++) {
-            new_i = (int)i + bishop_moves[k][0];
-            new_j = (int)j + bishop_moves[k][1];
-
-            while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-              if (position.board[(size_t)new_i][(size_t)new_j].color ==
-                  position.board[i][j].color) {
-                break;
-              }
-              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
-                moves++;
-              }
-              if (position.board[(size_t)new_i][(size_t)new_j].color == opponent) {
-                break;
-              }
-              new_i += bishop_moves[k][0];
-              new_j += bishop_moves[k][1];
-            }
-          }
-          if (position.board[i][j].type == 'B') {
-            break;
-          }
-        case 'R':
-          if (check->king_must_move) {
-            break;
-          }
-          for (size_t k = 0; k < 4; k++) {
-            new_i = (int)i + rook_moves[k][0];
-            new_j = (int)j + rook_moves[k][1];
-            while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-              if (position.board[(size_t)new_i][(size_t)new_j].color ==
-                  position.board[i][j].color) {
-                break;
-              }
-              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
-                moves++;
-              }
-              if (position.board[(size_t)new_i][(size_t)new_j].color == opponent) {
-                break;
-              }
-              new_i = new_i + rook_moves[k][0];
-              new_j = new_j + rook_moves[k][1];
-            }
-          }
-          break;
-
-      }
-
-      if (position.board[i][j].color == white) {
-        mobility_score +=
-            ((double)moves / piece_values[position.board[i][j].type]);
-      } else {
-        mobility_score -=
-            ((double)moves / piece_values[position.board[i][j].type]);
+        iter_i += bishop_moves[k];
       }
     }
-  }
+    // rook check
 
-  return mobility_score / 1000.0;
+    for (size_t k = 0; k < 4; k++) {
+      iter_i = (int)king_i + rook_moves[k];
+      if ((((iter_i & 7) != ((int)king_i & 7)) && ((iter_i >> 3) != ((int)king_i >> 3))) ||
+          iter_i > 63 || iter_i < 0) {
+        continue;
+      }
+      while (true) {
+        assert(iter_i >= 0 && iter_i <= 63);
+        if (position.board[(size_t)iter_i].color == position.board[i].color) {
+          break;
+        } else if (position.board[(size_t)new_i].color == opponent) {
+          if (position.board[(size_t)iter_i].type == 'R' ||
+              position.board[(size_t)iter_i].type == 'Q') {
+          return false;
+          }
+        }
+        if (k == 0) {
+          if (iter_i <= 7) {
+          break;
+          }
+        } else if (k == 1) {
+          if ((iter_i & 7) == 7) {
+          break;
+          }
+        } else if (k == 2) {
+          if (iter_i >= 56) {
+          break;
+          }
+        } else {
+          if ((iter_i & 7) == 0) {
+          break;
+          }
+        }
+        iter_i += rook_moves[k];
+      }
+    }
+    return true;
 }
 
 
-int CountMoves(Position& position) {
-  Color opponent;
+size_t CountPieceMoves(Position& position, size_t& i, const Check& check_info) {
+    size_t moves = 0;
+    int new_i;
+    Color opponent = position.board[i].color == white ? black : white;
+    switch (position.board[i].type) {
+      case 'P': {
+        if (check_info.king_must_move) {
+          break;
+        }
+        int multiplier;
+        size_t promotion_row_a, promotion_row_b, starting_row_a, starting_row_b,
+            en_passant_start_a, en_passant_start_b;
+        if (position.board[i].color == white) {
+          multiplier = -8;
+          starting_row_a = 48;
+          starting_row_b = 55;
+          promotion_row_a = 8;
+          promotion_row_b = 15;
+          en_passant_start_a = 24;
+          en_passant_start_b = 31;
+        } else {
+          multiplier = 8;
+          promotion_row_a = 48;
+          promotion_row_b = 55;
+          starting_row_a = 8;
+          starting_row_b = 15;
+          en_passant_start_a = 32;
+          en_passant_start_b = 39;
+        }
+        bool left_capture =
+            ((i & 7) != 0) &&
+            position.board[i + multiplier - 1].color == opponent;
+        bool right_capture =
+            ((i & 7) != 7) &&
+            position.board[i + multiplier + 1].color == opponent;
+        new_i = (int)i + multiplier;
+        if (i >= promotion_row_a && i < promotion_row_b) {
+          // promotion
+          for (size_t k = 0; k < 4; k++) {
+          // one square
+          if (position.board[(size_t)new_i].color == empty &&
+              MoveOk(check_info, i, (size_t)new_i)) {
+            moves++;
+          }
+          // captures to the left
+          if (left_capture && MoveOk(check_info, i, (size_t)new_i - 1)) {
+            moves++;
+          }
+          // captures to the right
+          if (right_capture && MoveOk(check_info, i, (size_t)new_i + 1)) {
+            moves++;
+          }
+          }
+        } else {
+          if (position.board[(size_t)new_i].color == empty) {
+          // one square forward
+          if (MoveOk(check_info, i, (size_t)new_i)) {
+            moves++;
+          }
+          // two squares forward
+          if (i >= starting_row_a && i <= starting_row_b &&
+              position.board[(size_t)new_i + multiplier].color == empty &&
+              MoveOk(check_info, i, (size_t)new_i + multiplier)) {
+            moves++;
+          }
+          }
+          // captures to the left
+          if (left_capture && MoveOk(check_info, i, (size_t)new_i - 1)) {
+          moves++;
+          }
+          // captures to the right
+          if (right_capture && MoveOk(check_info, i, (size_t)new_i + 1)) {
+          moves++;
+          }
+          // en passant to the left
+          if (i >= en_passant_start_a + 1 && i <= en_passant_start_b &&
+              position.board[i - 1].color == opponent &&
+              position.board[i - 1].type == 'P' &&
+              position.en_passant_target == new_i - 1 &&
+              MoveOk(check_info, i, (size_t)new_i - 1) &&
+              CheckEnPassantRights(position, i, new_i, new_i - 1, opponent)) {
+            moves++;
+          }
+          // en passant to the right
+          if (i >= en_passant_start_a && i <= (en_passant_start_b - 1) &&
+              position.board[i + 1].color == opponent &&
+              position.board[i + 1].type == 'P' &&
+              position.en_passant_target == new_i + 1 &&
+              MoveOk(check_info, i, (size_t)new_i + 1) &&
+              CheckEnPassantRights(position, i, new_i, new_i + 1, opponent)) {
+            moves++;
+          }
+        }
+        break;
+      }
+      case 'N':
+        if (check_info.king_must_move) {
+          break;
+        }
+        for (size_t k = 0; k < 8; k++) {
+          new_i = (int)i + knight_moves[k];
+          if (new_i >= 0 && new_i <= 63 && ((new_i & 7) - ((int)i & 7)) <= 2 &&
+              (new_i & 7) - ((int)i & 7) >= -2 &&
+              position.board[(size_t)new_i].color != position.board[i].color &&
+              MoveOk(check_info, i, (size_t)new_i)) {
+          moves++;
+          }
+        }
+        break;
+      case 'Q':
+      case 'B':
+        if (check_info.king_must_move) {
+          break;
+        }
+        for (size_t k = 0; k < 4; k++) {
+          new_i = (int)i + bishop_moves[k];
+          if (((new_i & 7) - ((int)i & 7)) > 1 ||
+              ((new_i & 7) - ((int)i & 7)) < -1 || new_i > 63 || new_i < 0) {
+          continue;
+          }
+          while (true) {
+          if (position.board[(size_t)new_i].color == position.board[i].color) {
+            break;
+          }
+          if (MoveOk(check_info, i, (size_t)new_i)) {
+            moves++;
+          }
+          if (position.board[(size_t)new_i].color == opponent) {
+            break;
+          }
+          if (new_i <= 8 || new_i >= 55 || (new_i & 7) == 7 ||
+              (new_i & 7) == 0) {
+            break;
+          }
+          new_i += bishop_moves[k];
+          }
+        }
+        if (position.board[i].type == 'B') {
+          break;
+        }
+      case 'R':
+        if (check_info.king_must_move) {
+          break;
+        }
+        for (size_t k = 0; k < 4; k++) {
+          new_i = (int)i + rook_moves[k];
+          if ((((new_i & 7) != ((int)i & 7)) &&
+               ((new_i >> 3) != ((int)i >> 3))) ||
+              new_i > 63 || new_i < 0) {
+          continue;
+          }
+          while (true) {
+          if (position.board[(size_t)new_i].color == position.board[i].color) {
+            break;
+          }
+          if (MoveOk(check_info, i, (size_t)new_i)) {
+            moves++;
+          }
+          if (position.board[(size_t)new_i].color == opponent) {
+            break;
+          }
+          if (k == 0) {
+            if (new_i <= 8) {
+              break;
+            }
+          } else if (k == 1) {
+            if ((new_i & 7) == 7) {
+              break;
+            }
+          } else if (k == 2) {
+            if (new_i >= 56) {
+              break;
+            }
+          } else {
+            if ((new_i & 7) == 0) {
+              break;
+            }
+          }
+          new_i += rook_moves[k];
+          }
+        }
+        break;
+      case 'K':
+        for (size_t k = 0; k < 8; k++) {
+          new_i = (int)i + king_moves[k];
+          if (new_i >= 0 && new_i <= 63 && ((new_i & 7) - ((int)i & 7)) <= 2 &&
+              (new_i & 7) - ((int)i & 7) >= -2 &&
+              position.board[(size_t)new_i].color != position.board[i].color &&
+              !InCheck(position, position.board[i].color, new_i)) {
+          moves++;
+          //} else {
+          //  delete new_position;
+          //}
+          }
+        }
+        if ((position.board[i].color == white ? position.castling.white_o_o
+                                    : position.castling.black_o_o) &&
+            position.board[i + 1].color == empty &&
+            position.board[i + 2].color == empty && !check_info.in_check &&
+            !InCheck(position, position.board[i].color, (int)i + 1) &&
+            !InCheck(position, position.board[i].color, (int)i + 2)) {
+          moves++;
+        }
+        if ((position.board[i].color == white ? position.castling.white_o_o_o
+                                    : position.castling.black_o_o_o) &&
+            position.board[i - 1].color == empty &&
+            position.board[i - 2].color == empty &&
+            position.board[i - 3].color == empty && !check_info.in_check &&
+            !InCheck(position, position.board[i].color, (int)i - 1) &&
+            !InCheck(position, position.board[i].color, (int)i - 2)) {
+          moves++;
+        }
+
+        break;
+    }
+    return moves;
+}
+
+
+size_t CountMoves(Position& position) {
   Check white_check;
   Check black_check;
   GetCheckInfo(white_check, position);
   GetCheckInfo(black_check, position);
-  int new_i, new_j;
-  int moves = 0;
-  Check* check;
-
-  for (size_t i = 0; i <= 7; i++) {
-    for (size_t j = 0; j <= 7; j++) {
-      if (position.board[i][j].color == empty) {
+  int new_i;
+  size_t moves = 0;
+  Check& check_info = white_check;
+  for (size_t i = 0; i <= 63; i++) {
+      if (position.board[i].color == empty) {
         continue;
       }
-      if (position.board[i][j].type == 'K') {
+      if (position.board[i].type == 'K') {
         for (size_t k = 0; k < 8; k++) {
-          new_i = (int)i + king_moves[k][0];
-          new_j = (int)j + king_moves[k][1];
-          if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
-              !InCheck(position, position.board[i][j].color, new_i, new_j)) {
+          new_i = (int)i + king_moves[k];
+          if (new_i >= 0 && new_i <= 63 &&
+              !InCheck(position, position.board[i].color, new_i)) {
             moves++;
           }
         }
         continue;
       }
-      if (position.board[i][j].color == white) {
-        check = &white_check;
+      if (position.board[i].color == white) {
+        check_info = white_check;
       } else {
-        check = &black_check;
+        check_info = black_check;
       }
       // counting moves
       // int addition = position.board[i][j].color == 'W' ? 1 : -1;
-      opponent = position.board[i][j].color == white ? black : white;
-      switch (position.board[i][j].type) {
-        case 'P': {
-          if (check->king_must_move) {
-            break;
-          }
-          int multiplier;
-          size_t promotion_row, starting_row, jump_row;
-          if (position.board[i][j].color == white) {
-            multiplier = -1;
-            starting_row = 6;
-            jump_row = 4;
-            promotion_row = 1;
-          } else {
-            multiplier = 1;
-            starting_row = 1;
-            jump_row = 3;
-            promotion_row = 6;
-          }
-          bool left_capture =
-              j > 0 && position.board[i + multiplier][j - 1].color == opponent;
-          bool right_capture =
-              j < 7 && position.board[i + multiplier][j + 1].color == opponent;
-          new_i = (int)i + multiplier;
-          if (i == promotion_row) {
-            // promotion
-            // one square
-
-            if (position.board[(size_t)new_i][j].color == empty) {
-              if (MoveOk(*check, i, j, (size_t)new_i, j)) {
-                moves += 4;
-              }
-            }
-            // captures to the left
-            if (left_capture && MoveOk(*check, i, j, (size_t)new_i, j - 1)) {
-              moves += 4;
-            }
-            // captures to the right
-            if (right_capture && MoveOk(*check, i, j, (size_t)new_i, j + 1)) {
-              moves += 4;
-            }
-          } else if (position.board[(size_t)new_i][j].color == empty) {
-            // one square forward
-            if (MoveOk(*check, i, j, (size_t)new_i, j)) {
-              moves++;
-            }
-            // two squares forward
-            if (i == starting_row &&
-                position.board[i + multiplier][j].color == empty &&
-                position.board[jump_row][j].color == empty &&
-                MoveOk(*check, i, j, jump_row, j)) {
-              moves++;
-            }
-          } else {
-            if (left_capture && MoveOk(*check, i, j, (size_t)new_i, j - 1)) {
-              moves++;
-            }
-            // captures to the right
-            if (left_capture && MoveOk(*check, i, j, (size_t)new_i, j + 1)) {
-              moves++;
-            }
-            // en passant to the left
-            size_t en_passant_start = jump_row + multiplier;
-            if (i == en_passant_start && j > 0 &&
-                position.board[i][j - 1].color == opponent &&
-                position.board[i][j - 1].type == 'P' &&
-                position.en_passant_target.Equals(new_i, (int)j - 1) &&
-                MoveOk(*check, i, j, (size_t)new_i, j - 1)) {
-              int di =
-                  (int)position.kings[position.board[i][j].color].row - (int)i;
-              int dj = (int)position.kings[position.board[i][j].color].column -
-                       (int)j - 1;
-              bool good = true;
-              if (position.kings[position.board[i][j].color].row == i) {
-                if (position.kings[position.board[i][j].color].column > j) {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j >= 0) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                        break;
-                      }
-                    }
-                    iter_j--;
-                  }
-                } else {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j <= 7) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                      }
-                      break;
-                    }
-                    iter_j++;
-                  }
-                }
-              }
-              if (good && std::abs(di) == std::abs(dj)) {
-                di = di > 0 ? 1 : -1;
-                dj = dj > 0 ? 1 : -1;
-                int iter_i = (int)i;
-                int iter_j = (int)j;
-
-                while (iter_i >= 0 && iter_i <= 7 && iter_j >= 0 &&
-                       iter_j <= 7) {
-                  if (position.board[(size_t)iter_i][(size_t)iter_j].color ==
-                      position.board[i][j].color) {
-                    break;
-
-                  } else if (position.board[(size_t)iter_i][(size_t)iter_j]
-                                 .color == opponent) {
-                    if (position.board[(size_t)iter_i][(size_t)iter_j].type ==
-                            'B' ||
-                        position.board[(size_t)iter_i][(size_t)iter_j].type ==
-                            'Q') {
-                      good = false;
-                    }
-                    break;
-                  }
-                  iter_i += di;
-                  iter_j += dj;
-                }
-              }
-              if (good) {
-                moves++;
-              }
-            }
-            // en passant to the right
-            if (i == en_passant_start && j < 7 &&
-                position.board[i][j + 1].color == opponent &&
-                position.board[i][j + 1].type == 'P' &&
-                position.en_passant_target.Equals(new_i, (int)j + 1) &&
-                MoveOk(*check, i, j, (size_t)new_i, j + 1)) {
-              int di =
-                  (int)position.kings[position.board[i][j].color].row - (int)i;
-              int dj = (int)position.kings[position.board[i][j].color].column -
-                       (int)j + 1;
-              bool good = true;
-              if (position.kings[position.board[i][j].color].row == i) {
-                if (position.kings[position.board[i][j].color].column > j) {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j >= 0) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                        break;
-                      }
-                    }
-                    iter_j--;
-                  }
-                } else {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j <= 7) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                      }
-                      break;
-                    }
-                    iter_j++;
-                  }
-                }
-              }
-              if (good && std::abs(di) == std::abs(dj)) {
-                di = di > 0 ? 1 : -1;
-                dj = dj > 0 ? 1 : -1;
-                int iter_i = (int)i;
-                int iter_j = (int)j;
-
-                while (iter_i >= 0 && iter_i <= 7 && iter_j >= 0 &&
-                       iter_j <= 7) {
-                  if (position.board[(size_t)iter_i][(size_t)iter_j].color ==
-                      position.board[i][j].color) {
-                    break;
-
-                  } else if (position.board[(size_t)iter_i][(size_t)iter_j]
-                                 .color == opponent) {
-                    if (position.board[(size_t)iter_i][(size_t)iter_j].type ==
-                            'B' ||
-                        position.board[(size_t)iter_i][(size_t)iter_j].type ==
-                            'Q') {
-                      good = false;
-                    }
-                    break;
-                  }
-                  iter_i += di;
-                  iter_j += dj;
-                }
-              }
-              if (good) {
-                moves++;
-              }
-            }
-          }
-          break;
-        }
-        case 'N':
-          if (check->king_must_move) {
-            break;
-          }
-          for (size_t k = 0; k < 8; k++) {
-            new_i = (int)i + knight_moves[k][0];
-            new_j = (int)j + knight_moves[k][1];
-            if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
-                position.board[(size_t)new_i][(size_t)new_j].color !=
-                    position.board[i][j].color) {
-              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
-                moves++;
-              }
-            }
-          }
-          break;
-        case 'Q':
-        case 'B':
-          if (check->king_must_move) {
-            break;
-          }
-          for (size_t k = 0; k < 4; k++) {
-            new_i = (int)i + bishop_moves[k][0];
-            new_j = (int)j + bishop_moves[k][1];
-
-            while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-              if (position.board[(size_t)new_i][(size_t)new_j].color ==
-                  position.board[i][j].color) {
-                break;
-              }
-              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
-                moves++;
-              }
-              if (position.board[(size_t)new_i][(size_t)new_j].color ==
-                  opponent) {
-                break;
-              }
-              new_i += bishop_moves[k][0];
-              new_j += bishop_moves[k][1];
-            }
-          }
-          if (position.board[i][j].type == 'B') {
-            break;
-          }
-        case 'R':
-          if (check->king_must_move) {
-            break;
-          }
-          for (size_t k = 0; k < 4; k++) {
-            new_i = (int)i + rook_moves[k][0];
-            new_j = (int)j + rook_moves[k][1];
-            while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-              if (position.board[(size_t)new_i][(size_t)new_j].color ==
-                  position.board[i][j].color) {
-                break;
-              }
-              if (MoveOk(*check, i, j, (size_t)new_i, (size_t)new_j)) {
-                moves++;
-              }
-              if (position.board[(size_t)new_i][(size_t)new_j].color ==
-                  opponent) {
-                break;
-              }
-              new_i = new_i + rook_moves[k][0];
-              new_j = new_j + rook_moves[k][1];
-            }
-          }
-          break;
-      }
+      moves += CountPieceMoves(position, i, check_info);
     }
-  }
+  
 
   return moves;
 }
 
 
-//
+          //
 //bool was_capture(const Board& board1, const Board& board2) {
 //  for (size_t i = 0; i < 8; i++) {
 //    for (size_t j = 0; j < 8; j++) {
@@ -1308,472 +1319,376 @@ bool board_exists(const Position& position, const Position& new_position) {
 
 void new_generate_moves(Position& position) {
   Position base_position = position.GenerateMovesCopy();
-  //base_position.previous_move = &position;
+  // base_position.previous_move = &position;
   Color opponent = position.white_to_move ? black : white;
   Position* new_position;
+  size_t moves = 0;
   if (position.outcomes == nullptr) {
     position.outcomes = new std::vector<Position*>;
   }
   Check check_info;
   GetCheckInfo(check_info, position);
 
-  int new_i, new_j;
-  for (size_t i = 0; i < 8; i++) {
-    for (size_t j = 0; j < 8; j++) {
-      if (position.board[i][j].color != (position.white_to_move ? white : black)) {
-        continue;
+  int new_i;
+  for (size_t i = 0; i < 63; i++) {
+    if (position.board[i].color == empty) {
+      continue;
+    }
+    moves = 0;
+    if (position.board[i].color == (position.white_to_move ? black : white)) {
+      
+
+      moves = CountPieceMoves(position, i, check_info);
+
+
+
+
+      if (!position.white_to_move) {
+          if (position.board[i].type == 'K') {
+            position.evaluation +=
+                ((double)moves / (double)king_value) / 1000.0;
+          } else {
+            position.evaluation +=
+                ((double)moves / (double)piece_values[position.board[i].type]) /
+                1000.0;
+          }
+      } else {
+          if (position.board[i].type == 'K') {
+            position.evaluation +=
+                ((double)moves / (double)king_value) / 1000.0;
+          } else {
+            position.evaluation -=
+                ((double)moves / (double)piece_values[position.board[i].type]) /
+                1000.0;
+          }
       }
-      int evaluation_multiplier = position.board[i][j].color == white ? 1 : -1;
-      switch (position.board[i][j].type) {
-        case 'P': {
+      continue;
+    }
+    int evaluation_multiplier = position.board[i].color == white ? 1 : -1;
+    switch (position.board[i].type) {
+      case 'P': {
           if (check_info.king_must_move) {
-            break;
+          break;
           }
           int multiplier;
-          size_t promotion_row, starting_row, jump_row;
-          if (position.board[i][j].color == white) {
-            multiplier = -1;
-            starting_row = 6;
-            jump_row = 4;
-            promotion_row = 1;
+          size_t starting_row_a,
+              starting_row_b, en_passant_start_a, en_passant_start_b;
+          if (position.board[i].color == white) {
+          multiplier = -8;
+          starting_row_a = 48;
+          starting_row_b = 55;
+          en_passant_start_a = 24;
+          en_passant_start_b = 31;
           } else {
-            multiplier = 1;
-            starting_row = 1;
-            jump_row = 3;
-            promotion_row = 6;
+          multiplier = 8;
+          starting_row_a = 8;
+          starting_row_b = 15;
+          en_passant_start_a = 32;
+          en_passant_start_b = 39;
           }
           bool left_capture =
-              j > 0 && position.board[i + multiplier][j - 1].color == opponent;
+              ((i & 7) != 0) &&
+              position.board[i + multiplier - 1].color == opponent;
+          assert((i + multiplier + 1) <= 63);
           bool right_capture =
-              j < 7 && position.board[i + multiplier][j + 1].color == opponent;
+              ((i & 7) != 7) &&
+              position.board[i + multiplier + 1].color == opponent;
           new_i = (int)i + multiplier;
-          if (i == promotion_row) {
-            // promotion
-            for (size_t k = 0; k < 4; k++) {
-              // one square
-              if (position.board[(size_t)new_i][j].color == empty &&
-                  MoveOk(check_info, i, j, (size_t)new_i, j)) {
-                new_position = base_position.CreateDeepCopy();
-                new_position->board[i + multiplier][j].color =
-                    new_position->board[i][j].color;
-                new_position->board[(size_t)new_i][j].type =
-                    promotion_pieces[k];
-                new_position->board[i][j].Empty();
-                new_position->evaluation +=
-                    piece_values[promotion_pieces[k]] - 1;
-                new_position->fifty_move_rule = 0;
-                position.outcomes->emplace_back(new_position);
-              }
-              // captures to the left
-              if (left_capture && MoveOk(check_info, i, j, (size_t)new_i, j - 1)) {
-                new_position = base_position.CreateDeepCopy();
-                new_position->board[i + multiplier][j - 1].color =
-                    new_position->board[i][j].color;
-                new_position->board[i + multiplier][j - 1].type =
-                    promotion_pieces[k];
-                new_position->board[i][j].Empty();
-                new_position->fifty_move_rule = 0;
-                new_position->evaluation +=
-                    (-
-                    multiplier *
-                    piece_values[position.board[(size_t)new_i][j - 1].type]) + piece_values[promotion_pieces[k]] - 1;
-                position.outcomes->emplace_back(new_position);
-              }
-              // captures to the right
-              if (right_capture && MoveOk(check_info, i, j, (size_t)new_i, j + 1)) {
-                new_position = base_position.CreateDeepCopy();
-                new_position->board[i + multiplier][j + 1].color =
-                    new_position->board[i][j].color;
-                new_position->board[(size_t)new_i][j + 1].type =
-                    promotion_pieces[k];
-                new_position->board[i][j].Empty();
-                new_position->fifty_move_rule = 0;
-                new_position->evaluation +=
-                    (-multiplier *
-                        piece_values[position.board[(size_t)new_i][j + 1].type]) +
-                    piece_values[promotion_pieces[k]] - 1;
-                position.outcomes->emplace_back(new_position);
-              }
-            }
-          } else {
-            if (position.board[(size_t)new_i][j].color == empty) {
-              // one square forward
-              if (MoveOk(check_info, i, j, (size_t)new_i, j)) {
-                new_position = base_position.CreateDeepCopy();
-                new_position->board[(size_t)new_i][j] = new_position->board[i][j];
-                new_position->board[i][j].Empty();
-                new_position->fifty_move_rule = 0;
-                position.outcomes->emplace_back(new_position);
-              }
-              // two squares forward
-              if (i == starting_row &&
-                  position.board[jump_row][j].color == empty &&
-                  MoveOk(check_info, i, j, jump_row, j)) {
-                new_position = base_position.CreateDeepCopy();
-                new_position->board[jump_row][j] =
-                    new_position->board[i][j];
-                new_position->fifty_move_rule = 0;
-                new_position->board[i][j].Empty();
-                new_position->en_passant_target.Set((int)i + multiplier, (int)j);
-                position.outcomes->emplace_back(new_position);
-              }
+          if (new_i < 8 || new_i > 55) {
+          // promotion
+          for (size_t k = 0; k < 4; k++) {
+            // one square
+            if (position.board[(size_t)new_i].color == empty &&
+                MoveOk(check_info, i, (size_t)new_i)) {
+              new_position = base_position.CreateDeepCopy();
+              new_position->board[(size_t)new_i].color =
+                  new_position->board[i].color;
+              new_position->board[(size_t)new_i].type = promotion_pieces[k];
+              new_position->board[i].Empty();
+              new_position->evaluation += piece_values[promotion_pieces[k]] - 1;
+              new_position->fifty_move_rule = 0;
+              moves++;
+              position.outcomes->emplace_back(new_position);
             }
             // captures to the left
-            if (left_capture && MoveOk(check_info, i, j, (size_t)new_i, j - 1)) {
+            if (left_capture && MoveOk(check_info, i, (size_t)new_i - 1)) {
               new_position = base_position.CreateDeepCopy();
-              new_position->board[(size_t)new_i][j - 1] =
-                  new_position->board[i][j];
-              new_position->board[i][j].Empty();
-              new_position->evaluation +=
-                  (-multiplier *
-                   piece_values[position.board[(size_t)new_i][j - 1].type]);
+              new_position->board[(size_t)new_i - 1].color =
+                  new_position->board[i].color;
+              new_position->board[(size_t)new_i - 1].type = promotion_pieces[k];
+              new_position->board[i].Empty();
               new_position->fifty_move_rule = 0;
-
+              if (position.white_to_move) {
+                new_position->evaluation +=
+                    (piece_values[position.board[(size_t)new_i - 1].type]) +
+                    piece_values[promotion_pieces[k]] - 1;
+              } else {
+                new_position->evaluation -=
+                    (piece_values[position.board[(size_t)new_i - 1].type]) +
+                    piece_values[promotion_pieces[k]] - 1;
+              }
+              moves++;
               position.outcomes->emplace_back(new_position);
             }
             // captures to the right
-            if (j < 7 &&
-                position.board[(size_t)new_i][j + 1].color == opponent &&
-                MoveOk(check_info, i, j, (size_t)new_i, j + 1)) {
+            if (right_capture && MoveOk(check_info, i, (size_t)new_i + 1)) {
               new_position = base_position.CreateDeepCopy();
-              new_position->board[i + multiplier][j + 1] =
-                  new_position->board[i][j];
-              new_position->board[i][j].Empty();
-              new_position->evaluation +=
-                  (-multiplier *
-                   piece_values[position.board[(size_t)new_i][j + 1].type]);
+              new_position->board[(size_t)new_i + 1].color =
+                  new_position->board[i].color;
+              new_position->board[(size_t)new_i + 1].type = promotion_pieces[k];
+              new_position->board[i].Empty();
               new_position->fifty_move_rule = 0;
+              if (position.white_to_move) {
+                new_position->evaluation +=
+                    (piece_values[position.board[(size_t)new_i + 1].type]) +
+                    piece_values[promotion_pieces[k]] - 1;
+              } else {
+                new_position->evaluation -=
+                    (piece_values[position.board[(size_t)new_i + 1].type]) +
+                    piece_values[promotion_pieces[k]] - 1;
+              }
+              moves++;
               position.outcomes->emplace_back(new_position);
             }
-            // en passant to the left
-            size_t en_passant_start = position.white_to_move ? (size_t)3 : (size_t)4;
-            if (i == en_passant_start && j > 0 &&
-                position.board[i][j - 1].color == opponent &&
-                position.board[i][j - 1].type == 'P' &&
-                position.en_passant_target.Equals((int)i + multiplier,
-                                                  (int)j - 1) &&
-                MoveOk(check_info, i, j, (size_t)new_i, j - 1)) {
-              int di = (int)position.kings[position.board[i][j].color].row - (int)i;
-              int dj = (int)position.kings[position.board[i][j].color].column -
-                       (int)j - 1;
-              bool good = true;
-              if (position.kings[position.board[i][j].color].row == i) {
-                if (position.kings[position.board[i][j].color].column > j) {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j >= 0) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                        break;
-                      }
-                    }
-                    iter_j--;
-                  }
-                } else {
-                  size_t iter_j =
-                      position.kings[position.board[i][j].color].column;
-                  while (iter_j <= 7) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                      }
-                      break;
-                    }
-                    iter_j++;
-                  }
-                }
-              }
-              if (good && std::abs(di) == std::abs(dj)) {
-                di = di > 0 ? 1 : -1;
-                dj = dj > 0 ? 1 : -1;
-                int iter_i = (int)i;
-                int iter_j = (int)j;
-
-                while (iter_i >= 0 && iter_i <= 7 && iter_j >= 0 &&
-                       iter_j <= 7) {
-                  if (position.board[(size_t)iter_i][(size_t)iter_j].color ==
-                      position.board[i][j].color) {
-                    break;
-
-                  } else if (position.board[(size_t)iter_i][(size_t)iter_j].color == opponent) {
-                    if (position.board[(size_t)iter_i][(size_t)iter_j].type ==
-                            'B' ||
-                        position.board[(size_t)iter_i][(size_t)iter_j].type ==
-                            'Q') {
-                      good = false;
-                    }
-                    break;
-                  }
-                  iter_i += di;
-                  iter_j += dj;
-                }
-              }
-              if (good) {
-                new_position = base_position.CreateDeepCopy();
-                new_position->board[(size_t)new_i][j - 1] =
-                    new_position->board[i][j];
-                new_position->board[i][j].Empty();
-                new_position->board[i][j - 1].Empty();
-                new_position->evaluation -= multiplier;
-                new_position->fifty_move_rule = 0;
-                position.outcomes->emplace_back(new_position);
-              }
+          }
+          } else {
+          if (position.board[(size_t)new_i].color == empty) {
+            // one square forward
+            if (MoveOk(check_info, i, (size_t)new_i)) {
+              new_position = base_position.CreateDeepCopy();
+              new_position->board[(size_t)new_i] = new_position->board[i];
+              new_position->board[i].Empty();
+              new_position->fifty_move_rule = 0;
+              moves++;
+              position.outcomes->emplace_back(new_position);
             }
-            // en passant to the right
-            if (i == en_passant_start && j < 7 &&
-                position.board[i][j + 1].color == opponent &&
-                position.board[i][j + 1].type == 'P' &&
-                position.en_passant_target.Equals(new_i, (int)j + 1) &&
-                MoveOk(check_info, i, j, (size_t)new_i, j + 1)) {
-              int di = (int)position.kings[position.board[i][j].color].row - (int)i;
-              int dj = (int)position.kings[position.board[i][j].color].column -
-                       (int)j + 1;
-              bool good = true;
-              if (position.kings[position.board[i][j].color].row == i) {
-                if (position.kings[position.board[i][j].color].column > j) {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j >= 0) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                        break;
-                      }
-                    }
-                    iter_j--;
-                  }
-                } else {
-                  int iter_j =
-                      (int)position.kings[position.board[i][j].color].column;
-                  while (iter_j <= 7) {
-                    if (position.board[i][(size_t)iter_j].color ==
-                        position.board[i][j].color) {
-                      break;
-                    }
-                    if (position.board[i][(size_t)iter_j].color == opponent) {
-                      if (position.board[i][(size_t)iter_j].type == 'R' ||
-                          position.board[i][(size_t)iter_j].type == 'Q') {
-                        good = false;
-                      }
-                      break;
-                    }
-                    iter_j++;
-                  }
-                }
-              }
-              if (good && std::abs(di) == std::abs(dj)) {
-                di = di > 0 ? 1 : -1;
-                dj = dj > 0 ? 1 : -1;
-                int iter_i = (int)i;
-                int iter_j = (int)j;
-
-                while (iter_i >= 0 && iter_i <= 7 && iter_j >= 0 &&
-                       iter_j <= 7) {
-                  if (position.board[(size_t)iter_i][(size_t)iter_j].color ==
-                      position.board[i][j].color) {
-                    break;
-
-                  } else if (position.board[(size_t)iter_i][(size_t)iter_j]
-                                 .color ==
-                             opponent) {
-                    if (position.board[(size_t)iter_i][(size_t)iter_j].type ==
-                            'B' ||
-                        position.board[(size_t)iter_i][(size_t)iter_j].type ==
-                            'Q') {
-                      good = false;
-                    }
-                    break;
-                  }
-                  iter_i += di;
-                  iter_j += dj;
-                }
-              }
-              if (good) {
-                new_position = base_position.CreateDeepCopy();
-                new_position->board[i + multiplier][j + 1] =
-                    new_position->board[i][j];
-                new_position->board[i][j].Empty();
-                new_position->board[i][j + 1].Empty();
-                new_position->evaluation -= multiplier;
-                new_position->fifty_move_rule = 0;
-                position.outcomes->emplace_back(new_position);
-              }
+            // two squares forward
+            if (i >= starting_row_a && i <= starting_row_b &&
+                position.board[(size_t)new_i + multiplier].color == empty &&
+                MoveOk(check_info, i, (size_t)new_i + multiplier)) {
+              new_position = base_position.CreateDeepCopy();
+              new_position->board[(size_t)new_i + multiplier] =
+                  new_position->board[i];
+              new_position->fifty_move_rule = 0;
+              new_position->board[i].Empty();
+              new_position->en_passant_target = new_i + multiplier;
+              moves++;
+              position.outcomes->emplace_back(new_position);
             }
+          }
+          // captures to the left
+          if (left_capture && MoveOk(check_info, i, (size_t)new_i - 1)) {
+            new_position = base_position.CreateDeepCopy();
+            new_position->board[(size_t)new_i - 1] = new_position->board[i];
+            new_position->board[i].Empty();
+            if (position.white_to_move) {
+              new_position->evaluation +=
+                  (piece_values[position.board[(size_t)new_i - 1].type]);
+            } else {
+              new_position->evaluation -=
+                  (piece_values[position.board[(size_t)new_i - 1].type]);
+            }
+            moves++;
+            position.outcomes->emplace_back(new_position);
+          }
+          // captures to the right
+          if (right_capture && MoveOk(check_info, i, (size_t)new_i + 1)) {
+            new_position = base_position.CreateDeepCopy();
+            new_position->board[(size_t)new_i + 1] = new_position->board[i];
+            new_position->board[i].Empty();
+            if (position.white_to_move) {
+              new_position->evaluation +=
+                  (piece_values[position.board[(size_t)new_i + 1].type]);
+            } else {
+              new_position->evaluation -=
+                  (piece_values[position.board[(size_t)new_i + 1].type]);
+            }
+            moves++;
+            position.outcomes->emplace_back(new_position);
+          }
+          // en passant to the left
+          if (i >= en_passant_start_a + 1 && i <= en_passant_start_b &&
+              position.board[i - 1].color == opponent &&
+              position.board[i - 1].type == 'P' &&
+              position.en_passant_target == new_i - 1 &&
+              MoveOk(check_info, i, (size_t)new_i - 1) &&
+              CheckEnPassantRights(position, i, new_i, new_i - 1, opponent)) {
+           
+              new_position = base_position.CreateDeepCopy();
+              new_position->board[(size_t)new_i - 1] = new_position->board[i];
+              new_position->board[i].Empty();
+              new_position->board[i - 1].Empty();
+              new_position->evaluation += evaluation_multiplier;
+              new_position->fifty_move_rule = 0;
+              moves++;
+              position.outcomes->emplace_back(new_position);
+           
+          }
+          // en passant to the right
+          if (i >= en_passant_start_a && i <= en_passant_start_b - 1 &&
+              position.board[i + 1].color == opponent &&
+              position.board[i + 1].type == 'P' &&
+              position.en_passant_target == new_i + 1 &&
+              MoveOk(check_info, i, (size_t)new_i + 1) && CheckEnPassantRights(position, i, new_i, new_i + 1, opponent)) {
+
+              new_position = base_position.CreateDeepCopy();
+              new_position->board[(size_t)new_i + 1] = new_position->board[i];
+              new_position->board[i].Empty();
+              new_position->board[i + 1].Empty();
+              new_position->evaluation += position.white_to_move ? 1 : -1;
+              new_position->fifty_move_rule = 0;
+              moves++;
+              position.outcomes->emplace_back(new_position);
+          }
           }
           break;
-        }
-        case 'N':
+      }
+      case 'N':
           if (check_info.king_must_move) {
-            break;
+          break;
           }
           for (size_t k = 0; k < 8; k++) {
-            new_i = (int)i + knight_moves[k][0];
-            new_j = (int)j + knight_moves[k][1];
-            if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
-                position.board[(size_t)new_i][(size_t)new_j].color !=
-                    position.board[i][j].color &&
-                MoveOk(check_info, i, j, (size_t)new_i, (size_t)new_j)) {
+          new_i = (int)i + knight_moves[k];
+          if (new_i >= 0 && new_i <= 63 &&
+              ((new_i & 7) - ((int)i & 7)) <= 2 && (new_i & 7) - ((int)i & 7) >= -2 &&
+              position.board[(size_t)new_i].color != position.board[i].color &&
+              MoveOk(check_info, i, (size_t)new_i)) {
+            new_position = base_position.CreateDeepCopy();
+            new_position->board[(size_t)new_i] = position.board[i];
+            new_position->board[i].Empty();
+            if (!position.board[(size_t)new_i].IsEmpty()) {
+              new_position->evaluation +=
+                  (evaluation_multiplier *
+                   piece_values[position.board[(size_t)new_i].type]);
+              new_position->fifty_move_rule = 0;
+            }
+            moves++;
+            position.outcomes->emplace_back(new_position);
+          }
+          }
+          break;
+      case 'Q':
+      case 'B':
+          if (check_info.king_must_move) {
+          break;
+          }
+          for (size_t k = 0; k < 4; k++) {
+          new_i = (int)i + bishop_moves[k];
+          if (((new_i & 7) - ((int)i & 7)) > 1 ||
+                  ((new_i & 7) - ((int)i & 7)) <-1 || new_i > 63 || new_i < 0) {
+            continue;
+          }
+          while (true) {
+            assert(new_i >= 0 && new_i <= 63);
+            if (position.board[(size_t)new_i].color ==
+                position.board[i].color) {
+              break;
+            }
+            if (MoveOk(check_info, i, (size_t)new_i)) {
               new_position = base_position.CreateDeepCopy();
-              new_position->board[(size_t)new_i][(size_t)new_j] = position.board[i][j];
-              new_position->board[i][j].Empty();
-              if (!position.board[(size_t)new_i][(size_t)new_j].IsEmpty()) {
+              new_position->board[(size_t)new_i] = position.board[i];
+              new_position->board[i].Empty();
+              if (!position.board[(size_t)new_i].IsEmpty()) {
+                new_position->fifty_move_rule = 0;
                 new_position->evaluation +=
                     (evaluation_multiplier *
-                     piece_values[position.board[(size_t)new_i][(size_t)new_j]
-                                      .type]);
-                new_position->fifty_move_rule = 0;
+                     piece_values[position.board[(size_t)new_i].type]);
               }
+              moves++;
               position.outcomes->emplace_back(new_position);
             }
+            if (position.board[(size_t)new_i].color == opponent) {
+              break;
+            }
+            if (new_i <= 8 || new_i >= 55 || (new_i & 7) == 7 ||
+                (new_i & 7) == 0) {
+              break;
+            }
+            new_i += bishop_moves[k];
           }
+          }
+          if (position.board[i].type == 'B') {
           break;
-        case 'Q':
-        case 'B':
+          }
+      case 'R':
           if (check_info.king_must_move) {
-            break;
+          break;
           }
           for (size_t k = 0; k < 4; k++) {
-            new_i = (int)i + bishop_moves[k][0];
-            new_j = (int)j + bishop_moves[k][1];
-
-            while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-              if (position.board[(size_t)new_i][(size_t)new_j].color ==
-                  position.board[i][j].color) {
-                break;
-              }
-              if (MoveOk(check_info, i, j, (size_t)new_i, (size_t)new_j)) {
-                new_position = base_position.CreateDeepCopy();
-                new_position->board[(size_t)new_i][(size_t)new_j] = position.board[i][j];
-                new_position->board[i][j].Empty();
-                if (!position.board[(size_t)new_i][(size_t)new_j]
-                                     .IsEmpty()) {
-                  new_position->fifty_move_rule = 0;
-                  new_position->evaluation +=
-                      (evaluation_multiplier *
-                       piece_values[position.board[(size_t)new_i][(size_t)new_j]
-                                        .type]);
-                }
-                position.outcomes->emplace_back(new_position);
-              }
-              if (position.board[(size_t)new_i][(size_t)new_j].color == opponent) {
-                break;
-              }
-              new_i += bishop_moves[k][0];
-              new_j += bishop_moves[k][1];
+          new_i = (int)i + rook_moves[k];
+          if ((((new_i & 7) != ((int)i & 7)) &&
+               ((new_i >> 3) != ((int)i >> 3))) ||
+              new_i > 63 || new_i < 0) {
+            continue;
+          }
+          while (true) {
+            assert(new_i >= 0 && new_i <= 63);
+            if (position.board[(size_t)new_i].color ==
+                position.board[i].color) {
+              break;
             }
-          }
-          if (position.board[i][j].type == 'B') {
-            break;
-          }
-        case 'R':
-          if (check_info.king_must_move) {
-            break;
-          }
-          for (size_t k = 0; k < 4; k++) {
-            new_i = (int)i + rook_moves[k][0];
-            new_j = (int)j + rook_moves[k][1];
-            while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-              if (position.board[(size_t)new_i][(size_t)new_j].color ==
-                  position.board[i][j].color) {
-                break;
-              }
-              if (MoveOk(check_info, i, j, (size_t)new_i, (size_t)new_j)) {
-                new_position = base_position.CreateDeepCopy();
-                new_position->board[(size_t)new_i][(size_t)new_j] = position.board[i][j];
-                new_position->board[i][j].Empty();
-                  if (position.board[7][7] == "WR" &&
-                      new_position->board[7][7] == "  ") {
-                    new_position->castling.white_o_o = false;
-                  } else if (position.board[7][0] == "WR" &&
-                             new_position->board[7][0] == "  ") {
-                    new_position->castling.white_o_o_o = false;
-                  } else if (position.board[0][7] == "BR" &&
-                             new_position->board[0][7] == "  ") {
-                    new_position->castling.black_o_o = false;
-                  } else if (position.board[0][0] == "WR" &&
-                             new_position->board[0][0] == "  ") {
-                    new_position->castling.black_o_o_o = false;
-                  }
-                  if (!position.board[(size_t)new_i][(size_t)new_j].IsEmpty()) {
-                    new_position->fifty_move_rule = 0;
-                    new_position->evaluation +=
-                        (evaluation_multiplier *
-                         piece_values[position.board[(size_t)new_i][(size_t)new_j].type]);
-                  }
-                  position.outcomes->emplace_back(new_position);
-              }
-              if (position.board[(size_t)new_i][(size_t)new_j].color == opponent) {
-                break;
-              }
-              new_i += rook_moves[k][0];
-              new_j += rook_moves[k][1];
-            }
-          }
-          break;
-        case 'K':
-          for (size_t k = 0; k < 8; k++) {
-            new_i = (int)i + king_moves[k][0];
-            new_j = (int)j + king_moves[k][1];
-            if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
-                position.board[(size_t)new_i][(size_t)new_j].color !=
-                    position.board[i][j].color &&
-                !InCheck(position, position.board[i][j].color, new_i, new_j)) {
+            if (MoveOk(check_info, i, (size_t)new_i)) {
               new_position = base_position.CreateDeepCopy();
-              new_position->board[(size_t)new_i][(size_t)new_j] = position.board[i][j];
-              new_position->board[i][j].Empty();
-              new_position->kings[position.board[i][j].color] = {(size_t)new_i,
-                                                       (size_t)new_j};
-              //if (!InCheck(*new_position, position.to_move)) {
-                if (position.white_to_move) {
-                  new_position->castling.white_o_o =
-                      new_position->castling.white_o_o_o = false;
-                } else {
-                  new_position->castling.black_o_o =
-                      new_position->castling.black_o_o_o = false;
-                }
-                if (!position.board[(size_t)new_i][(size_t)new_j].IsEmpty()) {
-                  new_position->fifty_move_rule = 0;
-                  new_position->evaluation +=
-                      (evaluation_multiplier *
-                       piece_values[position.board[(size_t)new_i][(size_t)new_j].type]);
-                }
-
-                position.outcomes->emplace_back(new_position);
-              //} else {
-              //  delete new_position;
-              //}
+              new_position->board[(size_t)new_i] = position.board[i];
+              new_position->board[i].Empty();
+              if (position.board[63].Equals(white, 'R') &&
+                  new_position->board[63].IsEmpty()) {
+                new_position->castling.white_o_o = false;
+              } else if (position.board[56].Equals(white, 'R') &&
+                         new_position->board[56].IsEmpty()) {
+                new_position->castling.white_o_o_o = false;
+              } else if (position.board[7].Equals(white, 'R') &&
+                         new_position->board[7].IsEmpty()) {
+                new_position->castling.black_o_o = false;
+              } else if (position.board[0].Equals(white, 'R') &&
+                         new_position->board[0].IsEmpty()) {
+                new_position->castling.black_o_o_o = false;
+              }
+              if (!position.board[(size_t)new_i].IsEmpty()) {
+                new_position->fifty_move_rule = 0;
+                new_position->evaluation +=
+                    (evaluation_multiplier *
+                     piece_values[position.board[(size_t)new_i].type]);
+              }
+              moves++;
+              position.outcomes->emplace_back(new_position);
             }
+            if (position.board[(size_t)new_i].color == opponent) {
+              break;
+            }
+            if (k == 0) {
+              if (new_i <= 7) {
+                break;
+              }
+            } else if (k == 1) {
+              if ((new_i & 7) == 7) {
+                break;
+              }
+            } else if (k == 2) {
+              if (new_i >= 56) {
+                break;
+              }
+            } else {
+              if ((new_i & 7) == 0) {
+                break;
+              }
+            }
+            new_i += rook_moves[k];
           }
-          if ((position.white_to_move
-                  ? position.castling.white_o_o
-                  : position.castling.black_o_o) &&
-                        position.board[i][j + 1].color == empty &&
-                        position.board[i][j + 2].color == empty &&
-                        !check_info.in_check &&
-              !InCheck(position, (position.white_to_move ? white : black), (int)i, (int)j + 1) &&
-              !InCheck(position, position.board[i][j].color, (int)i, (int)j + 2)) {
+          }
+          break;
+      case 'K':
+          for (size_t k = 0; k < 8; k++) {
+          new_i = (int)i + king_moves[k];
+          if (new_i >= 0 && new_i <= 63 && (new_i & 7) - ((int)i &7)< 2 &&
+              (new_i & 7) - ((int)i & 7) > -2 &&
+              position.board[(size_t)new_i].color != position.board[i].color &&
+              !InCheck(position, position.board[i].color, new_i)) {
             new_position = base_position.CreateDeepCopy();
-            new_position->board[i][6].set(position.board[i][j].color, 'K');
-            new_position->board[i][5].set(position.board[i][j].color, 'R');
-            new_position->kings[position.board[i][j].color] = {i, 6};
-            new_position->board[i][4].Empty();
-            new_position->board[i][7].Empty();
+            new_position->board[(size_t)new_i] = position.board[i];
+            new_position->board[i].Empty();
+            new_position->kings[position.board[i].color] = (size_t)new_i;
+            // if (!InCheck(*new_position, position.to_move)) {
             if (position.white_to_move) {
               new_position->castling.white_o_o =
                   new_position->castling.white_o_o_o = false;
@@ -1781,50 +1696,84 @@ void new_generate_moves(Position& position) {
               new_position->castling.black_o_o =
                   new_position->castling.black_o_o_o = false;
             }
-            position.outcomes->emplace_back(new_position);
-          }
-          if ((position.white_to_move
-                  ? position.castling.white_o_o_o
-                  : position.castling.black_o_o_o) &&
-                        position.board[i][j - 1].color == empty &&
-                        position.board[i][j - 2].color == empty &&
-                        position.board[i][j - 3].color == empty &&
-                        !check_info.in_check &&
-              !InCheck(position, position.board[i][j].color, (int)i, (int)j - 1) &&
-              !InCheck(position, position.board[i][j].color, (int)i, (int)j - 2)) {
-            new_position = base_position.CreateDeepCopy();
-            new_position->board[i][2].set(position.board[i][j].color, 'K');
-            new_position->board[i][3].set(position.board[i][j].color, 'R');
-            new_position->board[i][4].Empty();
-            new_position->board[i][0].Empty();
-            new_position->kings[position.white_to_move ? white : black] = {i, 2};
-            if (position.white_to_move) {
-              new_position->castling.white_o_o =
-                  new_position->castling.white_o_o_o = false;
-            } else {
-              new_position->castling.black_o_o =
-                  new_position->castling.black_o_o_o = false;
+            if (!position.board[(size_t)new_i].IsEmpty()) {
+              new_position->fifty_move_rule = 0;
+              new_position->evaluation +=
+                  (evaluation_multiplier *
+                   piece_values[position.board[(size_t)new_i].type]);
             }
+            moves++;
             position.outcomes->emplace_back(new_position);
+            //} else {
+            //  delete new_position;
+            //}
+          }
+          }
+          if ((position.white_to_move ? position.castling.white_o_o
+                                      : position.castling.black_o_o) &&
+              position.board[i + 1].color == empty &&
+              position.board[i + 2].color == empty && !check_info.in_check &&
+              !InCheck(position, position.board[i].color, (int)i + 1) &&
+              !InCheck(position, position.board[i].color, (int)i + 2)) {
+          new_position = base_position.CreateDeepCopy();
+          new_position->board[i + 2].set(position.board[i].color, 'K');
+          new_position->board[i + 1].set(position.board[i].color, 'R');
+          new_position->kings[position.board[i].color] = i + 2;
+          new_position->board[i].Empty();
+          new_position->board[i + 3].Empty();
+          if (position.white_to_move) {
+            new_position->castling.white_o_o =
+                new_position->castling.white_o_o_o = false;
+          } else {
+            new_position->castling.black_o_o =
+                new_position->castling.black_o_o_o = false;
+          }
+          moves++;
+          position.outcomes->emplace_back(new_position);
+          }
+          if ((position.white_to_move ? position.castling.white_o_o_o
+                                      : position.castling.black_o_o_o) &&
+              position.board[i - 1].color == empty &&
+              position.board[i - 2].color == empty &&
+              position.board[i - 3].color == empty && !check_info.in_check &&
+              !InCheck(position, position.board[i].color, (int)i - 1) &&
+              !InCheck(position, position.board[i].color, (int)i - 2)) {
+          new_position = base_position.CreateDeepCopy();
+          new_position->board[i - 2].set(position.board[i].color, 'K');
+          new_position->board[i - 1].set(position.board[i].color, 'R');
+          new_position->board[i - 4].Empty();
+          new_position->board[i].Empty();
+          new_position->kings[position.white_to_move ? white : black] = i - 2;
+          if (position.white_to_move) {
+            new_position->castling.white_o_o =
+                new_position->castling.white_o_o_o = false;
+          } else {
+            new_position->castling.black_o_o =
+                new_position->castling.black_o_o_o = false;
+          }
+          moves++;
+          position.outcomes->emplace_back(new_position);
           }
 
           break;
+    }
+    if (position.white_to_move) {
+      if (position.board[i].type == 'K') {
+          position.evaluation += ((double)moves / (double)king_value) / 1000.0;
+      } else {
+          position.evaluation +=
+              ((double)moves / (double)piece_values[position.board[i].type]) / 1000.0;
+      }
+    } else {
+      if (position.board[i].type == 'K') {
+          position.evaluation += ((double)moves / (double)king_value) / 1000.0;
+      } else {
+          position.evaluation -=
+              ((double)moves / (double)piece_values[position.board[i].type]) / 1000.0;
       }
     }
   }
-  /*if (position.outcomes->size() == 0) {
-    delete position.outcomes;
-    position.outcomes = nullptr;
-  }*/
-  // for (int i = 0; i < moves.size(); i++) {
-  //     for (int j = 0; j < 8; j++) {
-  //         for (int k = 0; k < 8; k++) {
-  //             std::cout << moves[i].first[j][k];
-  //         }
-  //         std::cout << std::endl;
-  //     }
-  // }
-  // return;
+
 }
 
 Position* FindPosition(const Board& board, const Position& position) {
@@ -1840,7 +1789,7 @@ Position* FindPosition(const Board& board, const Position& position) {
 
 struct Move {
   bool check;
-  std::vector<int> dest;
+  size_t dest;
   std::vector<int> start;
   char piece;
   bool capture;
@@ -1848,7 +1797,6 @@ struct Move {
   char promotion;
   Move()
       : check(false),
-        dest({-1, -1}),
         start({-1, -1}),
         piece(' '),
         capture(false),
@@ -1856,160 +1804,190 @@ struct Move {
         promotion(' ') {}
 };
 
-Board GetBoard(Move info, const Position& position) {
+Board GetBoard(Move info, Position& position) {
   Board board = position.board;
+  Check check_info;
+  GetCheckInfo(check_info, position);
   Color to_move = position.white_to_move ? white : black;
+  size_t count = 0;
+  size_t found = 64;
   switch (info.piece) {
     case 'P': {
-      int multiplier = to_move == white ? -1 : 1;
+      int multiplier = to_move == white ? -8 : 8;
       if (info.capture) {
-        if (board[(size_t)info.dest[0]][(size_t)info.dest[1]].color == empty) {
+        if (board[info.dest].color == empty) {
           // en passant
-          board[(size_t)info.dest[0]][(size_t)info.dest[1]] =
-              board[(size_t)info.dest[0] - multiplier][(size_t)info.start[1]];
-          board[(size_t)info.dest[0] - multiplier][(size_t)info.start[1]].Empty();
-          board[(size_t)info.dest[0] - multiplier][(size_t)info.dest[1]].Empty();
+          board[info.dest] = board[(((size_t)info.dest - multiplier) & (-8)) +
+                                   (size_t)info.start[1]];
+          board[(((size_t)info.dest - multiplier) & (-8)) +
+                (size_t)info.start[1]]
+              .Empty();
+          board[info.dest - multiplier].Empty();
         } else {
-          board[(size_t)info.dest[0]][(size_t)info.dest[1]] =
-              board[(size_t)info.dest[0] - multiplier][(size_t)info.start[1]];
-          board[(size_t)info.dest[0] - multiplier][(size_t)info.start[1]].Empty();
+          board[(size_t)info.dest] = board[(size_t)info.dest - multiplier];
+          board[(((size_t)info.dest - multiplier) & (-8)) + (size_t)info.start[1]].Empty();
         }
-      } else if (board[(size_t)info.dest[0] - multiplier][(size_t)info.dest[1]].type ==
+      } else if (board[(size_t)info.dest - multiplier].type ==
                  'P') {
-        board[(size_t)info.dest[0]][(size_t)info.dest[1]] =
-            board[(size_t)info.dest[0] - multiplier][(size_t)info.dest[1]];
-        board[(size_t)info.dest[0] - multiplier][(size_t)info.dest[1]].Empty();
+        board[info.dest] =
+            board[info.dest - multiplier];
+        board[info.dest - multiplier].Empty();
       } else {
-        board[(size_t)info.dest[0]][(size_t)info.dest[1]] =
-            board[position.white_to_move ? (size_t)6 : (size_t)1][(size_t)info.dest[1]];
-        board[position.white_to_move ? (size_t)6 : (size_t)1][(size_t)info.dest[1]].Empty();
+        board[info.dest] = board[info.dest - (size_t)(multiplier * 2)];
+        board[info.dest - (size_t)(multiplier * 2)].Empty();
       }
       if (info.promotion != ' ') {
-        board[(size_t)info.dest[0]][(size_t)info.dest[1]].type = info.promotion;
+        board[info.dest].type = info.promotion;
       }
       return board;
     }
     case 'N':
       for (size_t k = 0; k < 8; k++) {
-        int i = info.dest[0] + knight_moves[k][0];
-        int j = info.dest[1] + knight_moves[k][1];
-        if (i >= 0 && i <= 7 && j >= 0 && j <= 7 &&
-            board[(size_t)i][(size_t)j].color == to_move &&
-            board[(size_t)i][(size_t)j].type == 'N' &&
-            (info.start[0] != -1 ? i == info.start[0] : true) &&
-            (info.start[1] != -1 ? j == info.start[1] : true)) {
-          board[(size_t)info.dest[0]][(size_t)info.dest[1]] =
-              board[(size_t)i][(size_t)j];
-          board[(size_t)i][(size_t)j].Empty();
-          break;
+        int i = (int)info.dest + knight_moves[k];
+        if (i >= 0 && i <= 63 && ((i & 7) - ((int)info.dest & 7)) <= 2 &&
+            (i & 7) - ((int)info.dest & 7) >= -2 && board[(size_t)i].type == 'N' &&
+            board[(size_t)i].color == to_move &&
+            (info.start[0] == -1 || ((i >> 3) == info.start[0])) && 
+            (info.start[1] == -1 || ((i & 7) == info.start[1])) &&
+            MoveOk(check_info, (size_t)i, info.dest)) {
+          found = (size_t)i;
+          count++;
         }
       }
-      return board;
+        if (count == 1) {
+        board[info.dest] = board[found];
+        board[found].Empty();
+        }
+          return board;
+
     case 'Q':
     case 'B': {
-      Color opponent = to_move == white ? black : white;
-      for (size_t k = 0; k < 4; k++) {
-        int i = info.dest[0] + bishop_moves[k][0];
-        int j = info.dest[1] + bishop_moves[k][1];
-        while (i >= 0 && i <= 7 && j >= 0 && j <= 7) {
-          if (board[(size_t)i][(size_t)j].color == opponent) {
-            break;
-          }
-          if (board[(size_t)i][(size_t)j].type == info.piece &&
-              (info.start[0] != -1 ? i == info.start[0] : true) &&
-              (info.start[1] != -1 ? j == info.start[1] : true)) {
-            board[(size_t)info.dest[0]][(size_t)info.dest[1]] =
-                board[(size_t)i][(size_t)j];
-            board[(size_t)i][(size_t)j].Empty();
-            return board;
-          }
-          if (board[(size_t)i][(size_t)j].color == to_move) {
-            break;
-          }
-          i += bishop_moves[k][0];
-          j += bishop_moves[k][1];
+
+          for (size_t k = 0; k < 4; k++) {
+        int i = (int)info.dest + bishop_moves[k];
+        if (((i & 7) - ((int)info.dest & 7)) > 1 ||
+            ((i & 7) - ((int)info.dest & 7)) < -1 || i > 63 || i < 0) {
+          continue;
         }
-      }
-      [[fallthrough]];
+        while (true) {
+          if ((board[(size_t)i].type == 'B' || board[(size_t)i].type == 'Q') &&
+              board[(size_t)i].color == to_move &&
+              (info.start[0] == -1 || ((i >> 3) == info.start[0])) &&
+              (info.start[1] == -1 || ((i & 7) == info.start[1]))&&
+              MoveOk(check_info, (size_t)i, info.dest)) {
+            found = (size_t)i;
+            count++;
+          }
+          if (i <= 8 || i >= 55 || (i & 7) == 7 ||
+              (i & 7) == 0) {
+            break;
+          }
+          i += bishop_moves[k];
+        }
+          }
+          if (info.piece == 'B') {
+        if (count == 1) {
+          board[info.dest] = board[found];
+          board[found].Empty();
+        }
+        return board;
+          }
+
+          [[fallthrough]];
     }
     case 'R': {
-      Color opponent = to_move == white ? black : white;
-      for (size_t k = 0; k < 4; k++) {
-        int i = info.dest[0] + rook_moves[k][0];
-        int j = info.dest[1] + rook_moves[k][1];
-        while (i >= 0 && i <= 7 && j >= 0 && j <= 7) {
-          if (board[(size_t)i][(size_t)j].color == opponent) {
-            break;
+          for (size_t k = 0; k < 4; k++) {
+        int i = (int)info.dest + rook_moves[k];
+        if ((((i & 7) != ((int)info.dest & 7)) &&
+            ((i >> 3) != ((int)info.dest >> 3))) || i > 63 || i < 0) {
+          continue;
+        }
+        while (true) {
+          if ((board[(size_t)i].type == 'R' || board[(size_t)i].type == 'Q') &&
+              board[(size_t)i].color == to_move &&
+              (info.start[0] == -1 || ((i >> 3) == info.start[0])) &&
+              (info.start[1] == -1 || ((i & 7) == info.start[1]))&&
+              MoveOk(check_info, (size_t)i, info.dest)) {
+            found = (size_t)i;
+            count++;
           }
-          if (board[(size_t)i][(size_t)j].type == info.piece &&
-              (info.start[0] != -1 ? i == info.start[0] : true) &&
-              (info.start[1] != -1 ? j == info.start[1] : true)) {
-            board[(size_t)info.dest[0]][(size_t)info.dest[1]] =
-                board[(size_t)i][(size_t)j];
-            board[(size_t)i][(size_t)j].Empty();
+          if (k == 0) {
+            if (i <= 7) {
+              break;
+            }
+          } else if (k == 1) {
+            if ((i & 7) == 7) {
+              break;
+            }
+          } else if (k == 2) {
+            if (i >= 56) {
+              break;
+            }
+          } else {
+            if ((i & 7) == 0) {
+              break;
+            }
+          }
+          i += rook_moves[k];
+        }
+          }
+        if (count == 1) {
+          board[info.dest] = board[found];
+          board[found].Empty();
+        }
+        return board;
+    }
+    case 'K': {
+      int new_i;
+      for (size_t k = 0; k < 8; k++) {
+          new_i = (int)info.dest + king_moves[k];
+        if (new_i >= 0 && new_i <=  63) {
+          if (position.board[(size_t)new_i].type == 'K') {
+            board[info.dest] =
+                board[(size_t)new_i];
+            board[(size_t)new_i].Empty();
             return board;
           }
-          if (board[(size_t)i][(size_t)j].color == to_move) {
-            break;
-          }
-          i += rook_moves[k][0];
-          j += rook_moves[k][1];
         }
       }
       return board;
-    }
-    case 'K': {
-      int new_i, new_j;
-      for (size_t k = 0; k < 8; k++) {
-        new_i = info.dest[0] + king_moves[k][0];
-        new_j = info.dest[1] + king_moves[k][1];
-        if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-          if (position.board[(size_t)new_i][(size_t)new_j].type == 'K') {
-            board[(size_t)info.dest[0]][(size_t)info.dest[1]] =
-                board[(size_t)new_i][(size_t)new_j];
-            board[(size_t)new_i][(size_t)new_j].Empty();
-            return board;
-          }
-        }
-      }
     }
 
   }
-  return board;
 }
 
-Position* GetPosition(Position& position, const std::string& move) {
+Position* MoveToPosition(Position& position, const std::string& move) {
   Board new_board = position.board;
   if (move == "0-0" || move == "O-O") {
     if (position.white_to_move) {
-      new_board[7][6].set(white, 'K');
-      new_board[7][5].set(white, 'R');
-      new_board[7][4].Empty();
-      new_board[7][7].Empty();
+      new_board[62].set(white, 'K');
+      new_board[61].set(white, 'R');
+      new_board[60].Empty();
+      new_board[63].Empty();
     } else {
-      new_board[0][6].set(black, 'K');
-      new_board[0][5].set(black, 'R');
-      new_board[0][4].Empty();
-      new_board[0][7].Empty();
+      new_board[6].set(black, 'K');
+      new_board[5].set(black, 'R');
+      new_board[4].Empty();
+      new_board[7].Empty();
     }
     return FindPosition(new_board, position);
   }
   if (move == "O-O-O" || move == "0-0-0") {
     if (position.white_to_move) {
-      new_board[7][2].set(white, 'K');
-      new_board[7][3].set(white, 'R');
-      new_board[7][4].Empty();
-      new_board[7][0].Empty();
+      new_board[58].set(white, 'K');
+      new_board[59].set(white, 'R');
+      new_board[60].Empty();
+      new_board[56].Empty();
     } else {
-      new_board[0][2].set(black, 'K');
-      new_board[0][3].set(black, 'R');
-      new_board[0][4].Empty();
-      new_board[0][0].Empty();
+      new_board[2].set(black, 'K');
+      new_board[3].set(black, 'R');
+      new_board[4].Empty();
+      new_board[0].Empty();
     }
     return FindPosition(new_board, position);
   }
   Move info;
-  int current = (int) move.length() - 1;
+  int current = (int)move.length() - 1;
   if (pieces.count(move[0])) {
     info.piece = move[0];
   } else {
@@ -2027,9 +2005,9 @@ Position* GetPosition(Position& position, const std::string& move) {
     info.checkmate = true;
     current--;
   }
-  info.dest[0] = 8 - char_to_int(move[(size_t)current]);
+  info.dest = size_t(8 * (8 - char_to_int(move[(size_t)current])));
   current--;
-  info.dest[1] = move[(size_t)current] - 'a';
+  info.dest += size_t(move[(size_t)current] - 'a');
   current--;
   if (current == -1) {
     return FindPosition(GetBoard(info, position), position);
@@ -2054,6 +2032,8 @@ Position* GetPosition(Position& position, const std::string& move) {
   return FindPosition(GetBoard(info, position), position);
 }
 
+
+
 std::string MakeString(const Position& position, const bool& chess_notation, const bool& white_on_bottom) {
   std::stringstream result;
   if (!chess_notation) {
@@ -2065,13 +2045,14 @@ std::string MakeString(const Position& position, const bool& chess_notation, con
     }
   }
   if (white_on_bottom) {
-    for (size_t i = 0; i <= 7; i++) {
-      result << "  +----+----+----+----+----+----+----+----+\n"
-             << (chess_notation ? (8 - i) : i) << " |";
-      for (size_t j = 0; j <= 7; j++) {
-        char color;
+    for (size_t i = 0; i < 64; i++) {
+      if (i % 8 == 0) {
+        result << "  +----+----+----+----+----+----+----+----+\n"
+               << (chess_notation ? (8 - (i >> 3)) : (i >> 3)) << " |";
+      }
+      char color;
 
-        switch (position.board[i][j].color) {
+        switch (position.board[i].color) {
           case white:
             color = 'W';
             break;
@@ -2085,17 +2066,19 @@ std::string MakeString(const Position& position, const bool& chess_notation, con
             std::cout << std::endl << "Unknown color error in MakeString.";
             exit(1);
         }
-        result << ' ' << color << position.board[i][j].type
+        result << ' ' << color << position.board[i].type
                << " |";
-      }
-      result << '\n';
+        if ((i & 7) == 7) {
+          result << '\n';
+        }
     }
   }
   else {
-    for (int i = 7; i >= 0; i--) {
-      result << "  +----+----+----+----+----+----+----+----+\n"
-             << (chess_notation ? (8 - i) : i) << " |";
-      for (int j = 7; j >= 0; j--) {
+    for (int i = 63; i >= 0; i--) {
+        if ((i + 1) % 8 == 0) {
+          result << "  +----+----+----+----+----+----+----+----+\n"
+                 << (chess_notation ? (8 - (i >> 3)) : (i>>3)) << " |";
+        }
         //char piece;
         //bool white_piece = position.board[(size_t)i][(size_t)j].color == white;
         //switch (position.board[(size_t)i][(size_t)j].type) {
@@ -2113,7 +2096,7 @@ std::string MakeString(const Position& position, const bool& chess_notation, con
         //}
         char color;
         
-        switch (position.board[(size_t)i][(size_t)j].color) {
+        switch (position.board[(size_t)i].color) {
           case white:
             color = 'W';
             break;
@@ -2127,10 +2110,11 @@ std::string MakeString(const Position& position, const bool& chess_notation, con
             std::cout << std::endl << "Unknown color error in MakeString.";
             exit(1);
         }
-        result << ' ' << color << position.board[(size_t)i][(size_t)j].type
+        result << ' ' << color << position.board[(size_t)i].type
                << " |";
-      }
-      result << '\n';
+        if (((i + 1) & 7) == 0) {
+          result << '\n';
+        }
     }
   }
   result << "  +----+----+----+----+----+----+----+----+";
@@ -2185,17 +2169,14 @@ bool LessOutcome(const Position* position1, const Position* position2) {
 }
 int EvaluateMaterial(const Position& position) {
   int material = 0;
-  for (size_t i = 0; i < 8; i++) {
-    for (size_t j = 0; j < 8; j++) {
-      if (position.board[i][j].color == empty ||
-          position.board[i][j].type == 'K') {
-        continue;
-      }
-      if (position.board[i][j].color == white) {
-        material += piece_values[position.board[i][j].type];
-      } else {
-        material -= piece_values[position.board[i][j].type];
-      }
+  for (size_t i = 0; i < 63; i++) {
+    if (position.board[i].color == empty || position.board[i].type == 'K') {
+    continue;
+    }
+    if (position.board[i].color == white) {
+    material += piece_values[position.board[i].type];
+    } else {
+    material -= piece_values[position.board[i].type];
     }
   }
   return material;
@@ -2289,7 +2270,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
     }
   
   }
-
+  double initial_evaluation = position.evaluation;
   if (!position.outcomes) {
     new_generate_moves(position);
   }
@@ -2333,12 +2314,9 @@ void minimax(Position& position, int depth, double alpha, double beta,
 
   std::sort(position.outcomes->begin(), position.outcomes->end(),
             position.white_to_move ? GreaterOutcome : LessOutcome);
-  double initial_evaluation = position.evaluation;
   if (depth == 0 &&
-      position.outcomes->back()->evaluation == position.evaluation) {
+      position.outcomes->back()->evaluation == initial_evaluation) {
      //initial_evaluation = position.evaluation;
-     position.evaluation =
-         round(position.evaluation) + EvaluateMobility(position);
      if (position.white_to_move) {
        if (position.evaluation > alpha) {
          alpha = position.evaluation;
@@ -2691,53 +2669,62 @@ std::string GetMove(Position& position1, Position& position2,
 
 
   
-  std::vector<Point> differences;
-  for (size_t i = 0; i < 8; i++) {
-    for (size_t j = 0; j < 8; j++) {
-      if (position1.board[i][j] != position2.board[i][j]) {
-        differences.emplace_back(i, j);
+  std::vector<size_t> differences;
+  for (size_t i = 0; i < 63; i++) {
+      if (position1.board[i] != position2.board[i]) {
+        differences.emplace_back(i);
       }
-    }
+    
   }
   if (differences.size() == 4) {
-    if (position2.board[7][6].type == 'K' &&
-        position1.board[7][6].color == empty) {
+    if (position2.board[62].type == 'K' &&
+        position1.board[62].color == empty) {
       return chess_notation ? "O-O" : "74767775";
     }
-    if (position2.board[7][2].type == 'K' &&
-        position1.board[7][2].color == empty) {
+    if (position2.board[58].type == 'K' &&
+        position1.board[58].color == empty) {
       return chess_notation ? "O-O" : "74727073";
     }
-    if (position2.board[0][6].type == 'K' &&
-        position1.board[0][6].color == empty) {
+    if (position2.board[6].type == 'K' &&
+        position1.board[6].color == empty) {
       return chess_notation ? "O-O" : "04060705";
     }
-    if (position2.board[0][2].type == 'K' &&
-        position1.board[0][2].color == empty) {
+    if (position2.board[2].type == 'K' &&
+        position1.board[2].color == empty) {
       return chess_notation ? "O-O-O" : "04020003";
     }
   }
   if (differences.size() == 3) {
     if (position2
-            .board[(size_t)differences[0].row][(size_t)differences[0].column]
+            .board[(size_t)differences[0]]
       .color == empty) {
       if (chess_notation) {
-        return std::string({char('a'+ differences[2].column), 'x', char('a' + differences[1].column), char('0' + 8 - differences[0].row)});
+        return std::string({char('a' + (((differences[1] == differences[0] + 8)
+                                             ? differences[2]
+                                             : differences[1]) &
+                                        7)),
+                            'x', char('a' + (differences[0] & 7)),
+                            char('0' + 8 - (differences[0] >> 3))});
+        
       } else {
         std::stringstream output;
-        output << differences[2].row << differences[2].column << differences[1].row << differences[1].column << differences[0].row << differences[1].column;
+        output << (differences[2] >> 3) << (differences[2] & 7) << (differences[1] >> 3) << (differences[1] & 7) << (differences[0] >> 3) << (differences[1] & 7);
         return output.str();
       }
     } else {
       if (chess_notation) {
-        return std::string({char('a' + differences[2].column), 'x',
-                            char('a' + differences[0].column),
-                            char('0' + 8 - differences[0].row)});
+        return std::string({char('a' + (((differences[1] == differences[2] + 8)
+                                             ? differences[0]
+                                             : differences[1]) &
+                                        7)),
+                            'x', char('a' + (differences[2] & 7)),
+                            char('0' + 8 - (differences[2] >> 3))});
+
       } else {
         std::stringstream output;
-        output << differences[2].row << differences[2].column
-               << differences[0].row << differences[0].column
-               << differences[1].row << differences[1].column;
+        output << (differences[0] >> 3) << (differences[0] & 7)
+               << (differences[2] >> 3) << (differences[2] & 7)
+               << (differences[1] >> 3) << (differences[1] & 7);
         return output.str();
       }
     }
@@ -2746,8 +2733,8 @@ std::string GetMove(Position& position1, Position& position2,
     }*/
     
   }
-  Point origin, dest;
-  if (position2.board[differences[0].row][differences[0].column].color == empty) {
+  size_t origin, dest;
+  if (position2.board[differences[0]].color == empty) {
     origin = differences[0];
     dest = differences[1];
   } else {
@@ -2756,168 +2743,189 @@ std::string GetMove(Position& position1, Position& position2,
   }
   if (!chess_notation) {
     std::stringstream output;
-    output << origin.row << origin.column << dest.row << dest.column;
+    output << (origin >> 3) << (origin & 7) << (dest >> 3) << (dest & 7);
     return output.str();
   }
   Check check_info;
-  if (position1.board[(size_t)origin.row][(size_t)origin.column].type != 'P') {
+  if (position1.board[origin].type != 'P') {
     GetCheckInfo(check_info, position1);
   }
   std::stringstream output;
-  std::vector<Point> found;
-  switch (position1.board[(size_t)origin.row][(size_t)origin.column].type) {
+  std::vector<size_t> found;
+  switch (position1.board[origin].type) {
     case 'P':
-      if (position1.board[(size_t)dest.row][(size_t)dest.column].color != empty) {
+      if (position1.board[dest].color != empty) {
         // capture
-        output << (char) ('a' + origin.column) << 'x' << static_cast<char>('a' + dest.column)
-               << (8 - dest.row);
+        output << (char) ('a' + (origin & 7)) << 'x' << char('a' + (dest & 7))
+               << (8 - (dest >> 3));
       } else {
-        output << static_cast<char>('a' + dest.column) << (8 - dest.row);
+        output << char('a' + (dest & 7)) << (8 - (dest >> 3));
       }
-      if (position2.board[dest.row][dest.column].type != 'P') {
+      if (position2.board[dest].type != 'P') {
         // promotion
         output << '='
-               << position2.board[(size_t)dest.row][(size_t)dest.column].type;
+               << position2.board[dest].type;
       }
       break;
     case 'N':
       output << 'N';
       for (size_t k = 0; k < 8; k++) {
-        int new_i = (int)dest.row + knight_moves[k][0];
-        int new_j = (int)dest.column + knight_moves[k][1];
-        if (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7 &&
-            position1.board[(size_t)new_i][(size_t)new_j].color ==
-                    position2.board[(size_t)dest.row][(size_t)dest.column]
+        int new_i = (int)dest + knight_moves[k];
+        if (new_i >= 0 && new_i <= 63 &&
+            position1.board[(size_t)new_i].color ==
+                    position2.board[dest]
                     .color &&
-            position1.board[(size_t)new_i][(size_t)new_j].type == 'N' &&
-            ((size_t)new_i !=
-                origin.row || (size_t)new_j != origin.column) &&
-            MoveOk(check_info, (size_t)new_i, (size_t)new_j, (size_t)dest.row,
-                   (size_t)dest.column)) {
-          found.emplace_back((size_t)new_i, (size_t)new_j);
+            position1.board[(size_t)new_i].type == 'N' &&
+            (size_t)new_i !=
+                origin &&
+            MoveOk(check_info, (size_t)new_i, dest)) {
+          found.emplace_back((size_t)new_i);
         }
       }
       if (found.size() > 0) {
-        if (std::none_of(found.begin(), found.end(), [origin](Point p) {
-              return p.column == origin.column;
+        if (std::none_of(found.begin(), found.end(), [origin](size_t p) {
+              return (p & 7) == (origin & 7);
             })) {
-          output << (char) ('a' + origin.column);
-        } else if (std::none_of(found.begin(), found.end(), [origin](Point p) {
-                     return p.row == origin.row;
+          output << (char) ('a' + (origin & 7));
+        } else if (std::none_of(found.begin(), found.end(), [origin](size_t p) {
+                     return (p >> 3) == (origin >> 3);
                    })) {
-          output << 8 - origin.row;
+          output << 8 - (origin >> 3);
         } else {
-          output << static_cast<char>('a' + origin.column) << origin.row;
+          output << static_cast<char>('a' + (origin & 7)) << (origin >> 3);
         }
       }
-      if (position1.board[(size_t)dest.row][(size_t)dest.column].color != empty) {
+      if (position1.board[dest].color != empty) {
         output << 'x';
       }
-      output << static_cast<char> ('a' + dest.column) << (8 - dest.row);
+      output << char('a' + (dest & 7)) << (8 - (dest >> 3));
       break;
     case 'Q':
     case 'B':
-      output << position1.board[(size_t)origin.row][(size_t)origin.column].type;
+      output << position1.board[origin].type;
       for (size_t k = 0; k < 4; k++) {
-        int new_i = (int)dest.row + bishop_moves[k][0];
-        int new_j = (int)dest.column + bishop_moves[k][1];
-        while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-          if (position1.board[(size_t)new_i][(size_t)new_j].color == (position2.white_to_move ? white : black)) {
+        int new_i = (int)dest + bishop_moves[k];
+        if (((new_i & 7) - ((int)dest & 7)) > 1 ||
+            ((new_i & 7) - ((int)dest & 7)) < -1 || new_i > 63 || new_i < 0) {
+          continue;
+        }
+        while (true) {
+          if (position1.board[(size_t)new_i].color == (position2.white_to_move ? white : black)) {
             break;
           }
-          if (position1.board[(size_t)new_i][(size_t)new_j].color ==
+          if (position1.board[(size_t)new_i].color ==
                   (position1.white_to_move ? white : black)&&
-              position1.board[(size_t)new_i][(size_t)new_j].type ==
-                  position1.board[origin.row][origin.column].type &&
-              (new_i != (int)origin.row || new_j != (int)origin.column) &&
-              MoveOk(check_info, (size_t)new_i, (size_t)new_j, (size_t)dest.row,
-                     (size_t)dest.column)) {
-            found.emplace_back((size_t)new_i, (size_t)new_j);
+              position1.board[(size_t)new_i].type ==
+                  position1.board[origin].type &&
+              (new_i != (int)origin) &&
+              MoveOk(check_info, (size_t)new_i,dest)) {
+            found.emplace_back((size_t)new_i);
           }
-          if (position1.board[(size_t)new_i][(size_t)new_j].color ==
-              position2.board[(size_t)dest.row][(size_t)dest.column].color) {
+          if (position1.board[(size_t)new_i].color ==
+              position2.board[dest].color || new_i <= 8 || new_i >= 55 || (new_i & 7) == 7 ||
+              (new_i & 7) == 0) {
             break;
           }
-          new_i += bishop_moves[k][0];
-          new_j += bishop_moves[k][1];
+          new_i += bishop_moves[k];
         }
       }
-      if (position1.board[(size_t)origin.row][(size_t)origin.column].type ==
+      if (position1.board[origin].type ==
           'B') {
         if (found.size() > 0) {
-          if (std::none_of(found.begin(), found.end(), [origin](Point p) {
-                return p.column == origin.column;
+          if (std::none_of(found.begin(), found.end(), [origin](size_t p) {
+                return (p & 7) == (origin & 7);
               })) {
-            output << (char)('a' + origin.column);
+            output << (char)('a' + (origin & 7));
           } else if (std::none_of(
                          found.begin(), found.end(),
-                         [origin](Point p) { return p.row == origin.row; })) {
-            output << 8 - origin.row;
+                                  [origin](size_t p) {
+                                    return (p >> 3) == (origin >> 3);
+                                  })) {
+            output << 8 - (origin >> 3);
           } else {
-            output << (char)('a' + origin.column) << origin.row;
+            output << (char)('a' + (origin & 7)) << (origin >> 3);
           }
         }
-        if (position1.board[(size_t)dest.row][(size_t)dest.column].color !=
+        if (position1.board[dest].color !=
             empty) {
           output << 'x';
         }
-        output << (char)('a' + dest.column) << (8 - dest.row);
+        output << (char)('a' + (dest & 7)) << (8 - (dest >> 3));
         break;
       }
     case 'R':
-      if (position1.board[(size_t)origin.row][(size_t)origin.column].type ==
+      if (position1.board[origin].type ==
           'R') {
         output << 'R';
       }
       for (size_t k = 0; k < 4; k++) {
-        int new_i = (int)dest.row + rook_moves[k][0];
-        int new_j = (int)dest.column + rook_moves[k][1];
-        while (new_i >= 0 && new_i <= 7 && new_j >= 0 && new_j <= 7) {
-          if (position1.board[(size_t)new_i][(size_t)new_j].color ==
+        int new_i = (int)dest + rook_moves[k];
+        if ((((new_i & 7) != ((int)dest & 7)) &&
+             ((new_i >> 3) != ((int)dest >> 3))) ||
+            new_i > 63 || new_i < 0) {
+          continue;
+        }
+        while (true) {
+          if (position1.board[(size_t)new_i].color ==
               (position2.white_to_move ? white : black)) {
             break;
           }
-          if (position1.board[(size_t)new_i][(size_t)new_j].color ==
+          if (position1.board[(size_t)new_i].color ==
                   (position1.white_to_move ? white : black) &&
-              position1.board[(size_t)new_i][(size_t)new_j].type ==
-                  position1.board[origin.row][origin.column].type &&
-              ((size_t)new_i != origin.row || (size_t)new_j != origin.column) &&
-              MoveOk(check_info, (size_t)new_i, (size_t)new_j, (size_t)dest.row,
-                     (size_t)dest.column)) {
-            found.emplace_back(new_i, new_j);
+              position1.board[(size_t)new_i].type ==
+                  position1.board[origin].type &&
+              (size_t)new_i != origin &&
+              MoveOk(check_info, (size_t)new_i,dest)) {
+            found.emplace_back((size_t)new_i);
           }
-          if (position1.board[(size_t)new_i][(size_t)new_j].color ==
-              position2.board[(size_t)dest.row][(size_t)dest.column].color) {
+          if (position1.board[(size_t)new_i].color ==
+              position2.board[dest].color) {
             break;
           }
-          new_i += rook_moves[k][0];
-          new_j += rook_moves[k][1];
+          if (k == 0) {
+            if (new_i <= 7) {
+              break;
+            }
+          } else if (k == 1) {
+            if ((new_i & 7) == 7) {
+              break;
+            }
+          } else if (k == 2) {
+            if (new_i >= 56) {
+              break;
+            }
+          } else {
+            if ((new_i & 7) == 0) {
+              break;
+            }
+          }
+          new_i += rook_moves[k];
         }
       }
       if (found.size() > 0) {
-        if (std::none_of(found.begin(), found.end(), [origin](Point p) {
-              return p.column == origin.column;
+        if (std::none_of(found.begin(), found.end(), [origin](size_t p) {
+              return (p & 7) == (origin&7);
             })) {
-          output << (char)('a' + origin.column);
-        } else if (std::none_of(found.begin(), found.end(), [origin](Point p) {
-                     return p.row == origin.row;
+          output << (char)('a' + (origin&7));
+        } else if (std::none_of(found.begin(), found.end(), [origin](size_t p) {
+                     return (p >> 3) == (origin >> 3);
                    })) {
-          output << 8 - origin.row;
+          output << 8 - (origin >> 3);
         } else {
-          output << (char)('a' + origin.column) << origin.row;
+          output << char('a' + (origin&7)) << (8 - (origin>>3));
         }
       }
-      if (position1.board[dest.row][dest.column].color != empty) {
+      if (position1.board[dest].color != empty) {
         output << 'x';
       }
-      output << (char)('a' + dest.column) << (8 - dest.row);
+      output << (char)('a' + (dest & 7)) << (8 - (dest >> 3));
       break;
     case 'K':
       output << 'K';
-      if (position1.board[dest.row][dest.column].color != empty) {
+      if (position1.board[dest].color != empty) {
         output << 'x';
       }
-      output << (char)('a' + dest.column) << (8 - dest.row);
+      output << (char)('a' + (dest & 7)) << (8 - (dest >> 3));
       break;
       
 
@@ -2930,6 +2938,67 @@ std::string GetMove(Position& position1, Position& position2,
   }
   return output.str();
 }
+
+void ReadFEN(Position& position, std::string FEN) {
+
+std::stringstream elements_line(FEN);
+  std::vector<std::string> elements;
+  for (int i = 0; i < 6; i++) {
+    std::string s;
+    elements_line >> s;
+    elements.push_back(s);
+  }
+  size_t i = 0;
+  for (size_t k = 0; k < elements[0].length(); k++) {
+    if (elements[0][k] == '/') {
+      i++;
+      continue;
+    }
+    if (i > 63) {
+      std::cout << "FEN error";
+      exit(1);
+    }
+    if (isdigit(elements[0][k])) {
+      for (int l = char_to_int(elements[0][k]); l > 0; l--) {
+        if (i > 63) {
+          std::cout << "FEN error";
+          exit(1);
+        }
+        position.board[i].Empty();
+        i++;
+      }
+    } else {
+      if (islower(elements[0][k])) {
+        position.board[i].color = white;
+      } else {
+        position.board[i].color = white;
+      }
+      position.board[i].type = (char)toupper(elements[0][k]);
+      i++;
+    }
+  }
+  position.white_to_move = toupper(elements[1][0]) == 'W';
+  if (elements[2][0] == 'K') {
+    position.castling.white_o_o = true;
+  }
+  if (elements[2][0] == 'Q') {
+    position.castling.white_o_o_o = true;
+  }
+  if (elements[2][0] == 'k') {
+    position.castling.black_o_o = true;
+  }
+  if (elements[2][0] == 'q') {
+    position.castling.black_o_o_o = true;
+  }
+  if (elements[3] != "-") {
+    position.en_passant_target =
+        ((8 - char_to_int(elements[3][1])) * 8) + (elements[3][0] - 'a');
+  } else {
+    position.en_passant_target = -1;
+  }
+  position.fifty_move_rule = (size_t)stoi(elements[4]);
+}
+
 
 Position* ReadPGN(Position* position) {
   std::ifstream file;
@@ -2947,66 +3016,8 @@ Position* ReadPGN(Position* position) {
     }
     std::smatch match;
     if (std::regex_search(line, match, rgx) && match.size() == 3) {
-      if (match[1] ==  "FEN") {
-        std::stringstream elements_line(match[2]);
-        std::vector<std::string> elements;
-        for (int i = 0; i < 6; i++) {
-          std::string s;
-          elements_line >> s;
-          elements.push_back(s);
-        }
-        size_t i = 0;
-        size_t j = 0;
-        for (size_t k = 0; k < elements[0].length(); k++) {
-          if (elements[0][k] == '/') {
-            i++;
-            j = 0;
-            continue;
-          }
-          if (i > 7 || j > 7) {
-              std::cout << "FEN error";
-              exit(1);
-          }
-          if (isdigit(elements[0][k])) {
-            for (int l = char_to_int(elements[0][k]); l > 0; l--) {
-              if (j > 7) {
-                std::cout << "FEN error";
-                exit(1);
-              }
-              position->board[i][j].Empty();
-              j++;
-            }
-          } else {
-            if (islower(elements[0][k])) {
-              position->board[i][j].color = white;
-            } else {
-              position->board[i][j].color = white;
-            }
-            position->board[i][j].type = (char)toupper(elements[0][k]);
-            j++;
-          }
-
-        }
-        position->white_to_move = toupper(elements[1][0]) == 'W';
-        if (elements[2][0] == 'K') {
-          position->castling.white_o_o = true;
-        }
-        if (elements[2][0] == 'Q') {
-          position->castling.white_o_o_o = true;
-        }
-        if (elements[2][0] == 'k') {
-          position->castling.black_o_o = true;
-        }
-        if (elements[2][0] == 'q') {
-          position->castling.black_o_o_o = true;
-        }
-        if (elements[3] != "-") {
-          position->en_passant_target.row = elements[3][0] - 'a';
-          position->en_passant_target.column = char_to_int(elements[3][1]);
-        } else {
-          position->en_passant_target.clear();
-        }
-        position->fifty_move_rule = (size_t)stoi(elements[4]);
+      if (match[1] == "FEN") {
+        ReadFEN(*position, match[2]);
       }
       //std::cout << "Parsed match 1: " << match[1] << std::endl;
       //std::cout << "Parsed match 2: " << match[2] << std::endl;
@@ -3028,8 +3039,8 @@ Position* ReadPGN(Position* position) {
     for (size_t i = 1; (i < moves_match.size() && moves_match[i].matched); i++) {
       position_number++;
       new_generate_moves(*position);
-      assert(GetPosition(*position, moves_match[i]));
-      position = GetPosition(*position, moves_match[i]);
+      assert(MoveToPosition(*position, moves_match[i]));
+      position = MoveToPosition(*position, moves_match[i]);
       //moves_match[i];
     }
     moves_line_copy = moves_match.suffix().str();
@@ -3146,65 +3157,7 @@ SeekResult SeekPosition(Position* position, int moves) {
     std::smatch match;
     if (std::regex_search(line, match, rgx) && match.size() == 3) {
       if (match[1] == "FEN") {
-        std::stringstream elements_line(match[2]);
-        std::vector<std::string> elements;
-        for (int i = 0; i < 6; i++) {
-          std::string s;
-          elements_line >> s;
-          elements.push_back(s);
-        }
-        size_t i = 0;
-        size_t j = 0;
-        for (size_t k = 0; k < elements[0].length(); k++) {
-          if (elements[0][k] == '/') {
-            i++;
-            j = 0;
-            continue;
-          }
-          if (i > 7 || j > 7) {
-            std::cout << "FEN error";
-            exit(1);
-          }
-          if (isdigit(elements[0][k])) {
-            for (int l = char_to_int(elements[0][k]); l > 0; l--) {
-              if (j > 7) {
-                std::cout << "FEN error";
-                exit(1);
-              }
-              new_position->board[i][j].Empty();
-              j++;
-            }
-          } else {
-            if (islower(elements[0][k])) {
-              new_position->board[i][j].color = black;
-            } else {
-              new_position->board[i][j].color = white;
-            }
-            new_position->board[i][j].type = (char)toupper(elements[0][k]);
-          }
-
-          j++;
-        }
-        new_position->white_to_move = toupper(elements[1][0]) == 'W';
-        if (elements[2][0] == 'K') {
-          new_position->castling.white_o_o = true;
-        }
-        if (elements[2][0] == 'Q') {
-          new_position->castling.white_o_o_o = true;
-        }
-        if (elements[2][0] == 'k') {
-          new_position->castling.black_o_o = true;
-        }
-        if (elements[2][0] == 'q') {
-          new_position->castling.black_o_o_o = true;
-        }
-        if (elements[3] != "-") {
-          new_position->en_passant_target.row = elements[3][0] - 'a';
-          new_position->en_passant_target.column = char_to_int(elements[3][1]);
-        } else {
-          new_position->en_passant_target.clear();
-        }
-        new_position->fifty_move_rule = (size_t)stoi(elements[4]);
+        ReadFEN(*position, match[2]);
       }
 
     } else {
@@ -3221,7 +3174,7 @@ SeekResult SeekPosition(Position* position, int moves) {
     for (size_t i = 1; (i < moves_match.size() && moves_match[i].matched); i++) {
       position_number++;
       new_generate_moves(*new_position);
-      new_position = GetPosition(*new_position, moves_match[i]);
+      new_position = MoveToPosition(*new_position, moves_match[i]);
       if (position_number == new_position_number) {
         break;
       }
@@ -3252,16 +3205,14 @@ std::string ToLower(std::string input) {
 
 int CountMaterial(const Position& position) {
   int count = 0;
-  for (size_t i = 0; i < 8; i++) {
-    for (size_t j = 0; j < 8; j++) {
-      if (position.board[i][j].color != empty) {
-        if (position.board[i][j].type == 'K') {
+  for (size_t i = 0; i < 63; i++) {
+      if (position.board[i].color != empty) {
+        if (position.board[i].type == 'K') {
           count += 4;
         } else {
-          count += piece_values[position.board[i][j].type];
+          count += piece_values[position.board[i].type];
         }
       }
-    }
   }
   return count;
 }
@@ -3293,7 +3244,7 @@ const int max_positions = 2600000;
 
 void UpdateMinDepth(Position& position) {
   min_depth = (int)std::max(
-      4.0, round(log2(max_positions) / log2(CountMoves(position) / 2.0)));
+      4.0, round(log2(max_positions) / log2((double)CountMoves(position) / 2.0)));
 }
 
 int main() {
@@ -3366,13 +3317,10 @@ int main() {
     file.open("PGN_position.txt");
     file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
   }
-  for (size_t i = 0; i < 8; i++) {
-    for (size_t j = 0; j < 8; j++) {
-      if (position->board[i][j].type == 'K') {
-        position->kings[position->board[i][j].color].row = i;
-        position->kings[position->board[i][j].color].column = j;
+  for (size_t i = 0; i < 63; i++) {
+      if (position->board[i].type == 'K') {
+        position->kings[position->board[i].color] = i;
       }
-    }
   }
 
   bool chess_notation;
@@ -3393,7 +3341,6 @@ int main() {
     color = (char)toupper(color);
   }
   bool engine_white = color == 'W';
-
   char bottom_board;
   std::cout << "What color is on the bottom of the board? ";
   std::cin >> bottom_board;
@@ -3577,45 +3524,45 @@ ComplicatedLessOutcome);
     } else if (game_over) {
       new_position = nullptr;
     } else if (chess_notation) {
-      new_position = GetPosition(*position, move);
+      new_position = MoveToPosition(*position, move);
     } else {
       new_board = position->board;
       if (move == "O-O" || move == "0-0") {
         if (position->white_to_move) {
-          new_board[7][6].set(white, 'K');
-          new_board[7][5].set(white, 'R');
-          new_board[7][4].Empty();
-          new_board[7][7].Empty();
+          new_board[62].set(white, 'K');
+          new_board[61].set(white, 'R');
+          new_board[60].Empty();
+          new_board[63].Empty();
         } else {
-          new_board[0][6].set(black, 'K');
-          new_board[0][5].set(black, 'R');
-          new_board[0][4].Empty();
-          new_board[0][7].Empty();
+          new_board[6].set(black, 'K');
+          new_board[5].set(black, 'R');
+          new_board[4].Empty();
+          new_board[7].Empty();
         }
       } else if (move == "O-O-O" || move == "0-0-0") {
         if (position->white_to_move) {
-          new_board[7][2].set(white, 'K');
-          new_board[7][3].set(white, 'R');
-          new_board[7][4].Empty();
-          new_board[7][0].Empty();
+          new_board[58].set(white, 'K');
+          new_board[59].set(white, 'R');
+          new_board[60].Empty();
+          new_board[56].Empty();
         } else {
-          new_board[0][2].set(black, 'K');
-          new_board[0][3].set(black, 'R');
-          new_board[0][4].Empty();
-          new_board[0][0].Empty();
+          new_board[2].set(black, 'K');
+          new_board[3].set(black, 'R');
+          new_board[4].Empty();
+          new_board[0].Empty();
         }
       } else {
         size_t si = char_to_size_t(move[0]);
         size_t sj = char_to_size_t(move[1]);
         size_t di = char_to_size_t(move[2]);
         size_t dj = char_to_size_t(move[3]);
-        new_board[di][dj] = new_board[si][sj];
-        new_board[si][sj].Empty();
+        new_board[di * 8 + dj] = new_board[si * 8 +sj];
+        new_board[si* 8 + sj].Empty();
         if (move.length() == 6) {
           if (move[5] == '=') {
-            new_board[di][dj].type = (char)toupper(move[6]);
+            new_board[di * 8 + dj].type = (char)toupper(move[6]);
           } else {
-            new_board[char_to_size_t(move[4])][char_to_size_t(move[5])].Empty();
+            new_board[char_to_size_t(move[4]) * 8 + char_to_size_t(move[5])].Empty();
           }
         }
         new_position = FindPosition(new_board, *position);
