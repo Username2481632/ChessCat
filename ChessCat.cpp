@@ -2034,21 +2034,13 @@ Position* MoveToPosition(Position& position, const std::string& move) {
 
 
 
-std::string MakeString(const Position& position, const bool& chess_notation, const bool& white_on_bottom) {
+std::string MakeString(const Position& position, const bool& white_on_bottom) {
   std::stringstream result;
-  if (!chess_notation) {
-    if (white_on_bottom) {
-      result << "    0    1    2    3    4    5    6    7   \n";
-    }
-    else {
-      result << "    7    6    5    4    3    2    1    0   \n";
-    }
-  }
   if (white_on_bottom) {
     for (size_t i = 0; i < 64; i++) {
       if (i % 8 == 0) {
         result << "  +----+----+----+----+----+----+----+----+\n"
-               << (chess_notation ? (8 - (i >> 3)) : (i >> 3)) << " |";
+               << (8 - (i >> 3)) << " |";
       }
       char color;
 
@@ -2077,23 +2069,8 @@ std::string MakeString(const Position& position, const bool& chess_notation, con
     for (int i = 63; i >= 0; i--) {
         if ((i + 1) % 8 == 0) {
           result << "  +----+----+----+----+----+----+----+----+\n"
-                 << (chess_notation ? (8 - (i >> 3)) : (i>>3)) << " |";
+                 << (8 - (i >> 3)) << " |";
         }
-        //char piece;
-        //bool white_piece = position.board[(size_t)i][(size_t)j].color == white;
-        //switch (position.board[(size_t)i][(size_t)j].type) {
-        //  case 'K':
-        //    piece = white_piece ? '\u2654' : '\u265A';
-        //    break;
-        //  case 'Q':
-        //    piece = white_piece ? '\u2655' : '\u265B';
-        //    break;
-        //  case 'R':
-        //    piece = white_piece ? '\u2656' : '\u265C';
-        //    break;
-        //  default:
-        //    piece = ' ';
-        //}
         char color;
         
         switch (position.board[(size_t)i].color) {
@@ -2118,14 +2095,12 @@ std::string MakeString(const Position& position, const bool& chess_notation, con
     }
   }
   result << "  +----+----+----+----+----+----+----+----+";
-  if (chess_notation) {
     if (white_on_bottom) {
     result << "\n    a    b    c    d    e    f    g    h    ";
     }
     else {
     result << "\n    h    g    f    e    d    c    b    a    ";
     }
-  }
   return result.str();
 }
 
@@ -2169,7 +2144,7 @@ bool LessOutcome(const Position* position1, const Position* position2) {
 }
 int EvaluateMaterial(const Position& position) {
   int material = 0;
-  for (size_t i = 0; i < 63; i++) {
+  for (size_t i = 0; i < 64; i++) {
     if (position.board[i].color == empty || position.board[i].type == 'K') {
     continue;
     }
@@ -2271,11 +2246,13 @@ void minimax(Position& position, int depth, double alpha, double beta,
   
   }
   double initial_evaluation = position.evaluation;
+  bool h = false;
   if (!position.outcomes) {
+
     new_generate_moves(position);
   }
-  else {
-    position.evaluation = EvaluateMaterial(position);
+  else if (depth == 0) {
+     h = true;
   }
 
   if (position.outcomes->size() == 0) {
@@ -2314,6 +2291,9 @@ void minimax(Position& position, int depth, double alpha, double beta,
 
   std::sort(position.outcomes->begin(), position.outcomes->end(),
             position.white_to_move ? GreaterOutcome : LessOutcome);
+  if (depth == 0 && h) {
+     int hirello;
+  }
   if (depth == 0 &&
       position.outcomes->back()->evaluation == initial_evaluation) {
      //initial_evaluation = position.evaluation;
@@ -2652,85 +2632,48 @@ void calculate_moves(void* varg) {
 using VBoard = std::vector<std::vector<std::string>>;
 
 
-std::string GetMove(Position& position1, Position& position2,
-  const bool chess_notation) {
-  //if (position1.castling.white_o_o != position2.castling.white_o_o) {
-  //  return chess_notation ? "O-O" : "74767775";
-  //}
-  //if (position1.castling.white_o_o_o != position2.castling.white_o_o_o) {
-  //  return chess_notation ? "O-O-O" : "74727073";
-  //}
-  //if (position1.castling.black_o_o != position2.castling.black_o_o) {
-  //  return chess_notation ? "O-O" : "04060705";
-  //}
-  //if (position1.castling.black_o_o_o != position2.castling.black_o_o_o) {
-  //  return chess_notation ? "O-O-O" : "04020003";
-  //}
+std::string GetMove(Position& position1, Position& position2) {
 
 
   
   std::vector<size_t> differences;
-  for (size_t i = 0; i < 63; i++) {
+  for (size_t i = 0; i < 64; i++) {
       if (position1.board[i] != position2.board[i]) {
         differences.emplace_back(i);
       }
     
   }
-  if (differences.size() == 4) {
-    if (position2.board[62].type == 'K' &&
-        position1.board[62].color == empty) {
-      return chess_notation ? "O-O" : "74767775";
+  if (differences.size() == 4) { // optimization: use position1 catling rights != position2 castling rights
+    if ((position2.board[62].type == 'K' &&
+        position1.board[62].color == empty) || (position2.board[6].type == 'K' &&
+        position1.board[6].color == empty)) {
+      return "O-O";
     }
-    if (position2.board[58].type == 'K' &&
-        position1.board[58].color == empty) {
-      return chess_notation ? "O-O" : "74727073";
-    }
-    if (position2.board[6].type == 'K' &&
-        position1.board[6].color == empty) {
-      return chess_notation ? "O-O" : "04060705";
-    }
-    if (position2.board[2].type == 'K' &&
-        position1.board[2].color == empty) {
-      return chess_notation ? "O-O-O" : "04020003";
+    if ((position2.board[58].type == 'K' &&
+        position1.board[58].color == empty) || (position2.board[2].type == 'K' &&
+        position1.board[2].color == empty)) {
+      return "O-O-O";
     }
   }
   if (differences.size() == 3) {
     if (position2
             .board[(size_t)differences[0]]
       .color == empty) {
-      if (chess_notation) {
         return std::string({char('a' + (((differences[1] == differences[0] + 8)
                                              ? differences[2]
                                              : differences[1]) &
                                         7)),
                             'x', char('a' + (differences[0] & 7)),
                             char('0' + 8 - (differences[0] >> 3))});
-        
-      } else {
-        std::stringstream output;
-        output << (differences[2] >> 3) << (differences[2] & 7) << (differences[1] >> 3) << (differences[1] & 7) << (differences[0] >> 3) << (differences[1] & 7);
-        return output.str();
-      }
     } else {
-      if (chess_notation) {
         return std::string({char('a' + (((differences[1] == differences[2] + 8)
                                              ? differences[0]
                                              : differences[1]) &
                                         7)),
                             'x', char('a' + (differences[2] & 7)),
                             char('0' + 8 - (differences[2] >> 3))});
-
-      } else {
-        std::stringstream output;
-        output << (differences[0] >> 3) << (differences[0] & 7)
-               << (differences[2] >> 3) << (differences[2] & 7)
-               << (differences[1] >> 3) << (differences[1] & 7);
-        return output.str();
-      }
     }
-    /*else {
-      return chess_notation ? 'a' + differences[1].column : '0'; 
-    }*/
+
     
   }
   size_t origin, dest;
@@ -2740,11 +2683,6 @@ std::string GetMove(Position& position1, Position& position2,
   } else {
     origin = differences[1];
     dest = differences[0];
-  }
-  if (!chess_notation) {
-    std::stringstream output;
-    output << (origin >> 3) << (origin & 7) << (dest >> 3) << (dest & 7);
-    return output.str();
   }
   Check check_info;
   if (position1.board[origin].type != 'P') {
@@ -3205,7 +3143,7 @@ std::string ToLower(std::string input) {
 
 int CountMaterial(const Position& position) {
   int count = 0;
-  for (size_t i = 0; i < 63; i++) {
+  for (size_t i = 0; i < 64; i++) {
       if (position.board[i].color != empty) {
         if (position.board[i].type == 'K') {
           count += 4;
@@ -3317,15 +3255,11 @@ int main() {
     file.open("PGN_position.txt");
     file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
   }
-  for (size_t i = 0; i < 63; i++) {
+  for (size_t i = 0; i < 64; i++) {
       if (position->board[i].type == 'K') {
         position->kings[position->board[i].color] = i;
       }
   }
-
-  bool chess_notation;
-  std::cout << "Chess notation? ";
-  std::cin >> chess_notation;
   //std::cout << InCheck(*position, position->to_move);
   
   // standard notation: type the coordinates of the starting and end point (such as 6444 for e4). if you type one more point, that point becomes an empty square (for en passant). For castling, type the king move and the rook move right after each other. For promotions, add =[insert piece type] after the pawn move (such as 1404=Q) piece types are Q, B, R, N.
@@ -3355,7 +3289,7 @@ int main() {
   std::string lower_move;
   //new_generate_moves(*position);
   SeekResult result;
-  std::cout << MakeString(*position, chess_notation, white_on_bottom) << std::endl;
+  std::cout << MakeString(*position, white_on_bottom) << std::endl;
   if (engine_white == position->white_to_move) {
     //std::cout << "My move: ";
     UpdateMinDepth(*position);
@@ -3418,7 +3352,7 @@ int main() {
 ComplicatedLessOutcome);
 }*/
         std::string move_string =
-            GetMove(*position, *best_move, chess_notation);
+            GetMove(*position, *best_move);
 
         game_status = CheckGameOver(best_move);
 
@@ -3438,7 +3372,7 @@ ComplicatedLessOutcome);
                                  // next statement to execute when this thread
                                  // returns from the current function"
         if (!mental_chess) { // died with this
-          std::cout << MakeString(*best_move, chess_notation, white_on_bottom) << std::endl;
+          std::cout << MakeString(*best_move, white_on_bottom) << std::endl;
           std::cout << "Material evaluation: " << EvaluateMaterial(*best_move) << std::endl;
           std::cout << "Evaluation on depth "
                     << ((best_move->depth == -1)
@@ -3452,10 +3386,10 @@ ComplicatedLessOutcome);
             std::cout << std::endl << "Line was size 0";
             exit(1);
           }
-          std::cout << GetMove(*position, *line[0], chess_notation);
+          std::cout << GetMove(*position, *line[0]);
           //std::cout << "[got first move] ";
           for (size_t i = 1; i < line.size(); i++) {
-            std::cout << ' ' << GetMove(*line[i - 1], *line[i], chess_notation);
+            std::cout << ' ' << GetMove(*line[i - 1], *line[i]);
             //std::cout << "[got next move] ";
           }
           std::cout/* << "[finished line]"*/ << std::endl;
@@ -3509,7 +3443,7 @@ ComplicatedLessOutcome);
       waiting.acquire();
 
       if (!mental_chess) {
-            std::cout << MakeString(*new_position, chess_notation, white_on_bottom) << std::endl;
+            std::cout << MakeString(*new_position, white_on_bottom) << std::endl;
             std::cout << Convert(new_position->evaluation) << std::endl;
       }
       game_over = false;
@@ -3523,50 +3457,8 @@ ComplicatedLessOutcome);
       continue;
     } else if (game_over) {
       new_position = nullptr;
-    } else if (chess_notation) {
-      new_position = MoveToPosition(*position, move);
     } else {
-      new_board = position->board;
-      if (move == "O-O" || move == "0-0") {
-        if (position->white_to_move) {
-          new_board[62].set(white, 'K');
-          new_board[61].set(white, 'R');
-          new_board[60].Empty();
-          new_board[63].Empty();
-        } else {
-          new_board[6].set(black, 'K');
-          new_board[5].set(black, 'R');
-          new_board[4].Empty();
-          new_board[7].Empty();
-        }
-      } else if (move == "O-O-O" || move == "0-0-0") {
-        if (position->white_to_move) {
-          new_board[58].set(white, 'K');
-          new_board[59].set(white, 'R');
-          new_board[60].Empty();
-          new_board[56].Empty();
-        } else {
-          new_board[2].set(black, 'K');
-          new_board[3].set(black, 'R');
-          new_board[4].Empty();
-          new_board[0].Empty();
-        }
-      } else {
-        size_t si = char_to_size_t(move[0]);
-        size_t sj = char_to_size_t(move[1]);
-        size_t di = char_to_size_t(move[2]);
-        size_t dj = char_to_size_t(move[3]);
-        new_board[di * 8 + dj] = new_board[si * 8 +sj];
-        new_board[si* 8 + sj].Empty();
-        if (move.length() == 6) {
-          if (move[5] == '=') {
-            new_board[di * 8 + dj].type = (char)toupper(move[6]);
-          } else {
-            new_board[char_to_size_t(move[4]) * 8 + char_to_size_t(move[5])].Empty();
-          }
-        }
-        new_position = FindPosition(new_board, *position);
-      }
+      new_position = MoveToPosition(*position, move);
     }
     if (new_position != nullptr) {
       // Position* played_position = new_position;
@@ -3575,7 +3467,7 @@ ComplicatedLessOutcome);
       stop_mutex.unlock();
       //printf("[main thread %d] acquire.\n", GetCurrentThreadId());
       waiting.acquire();
-      UpdatePGN(new_position, GetMove(*position, *new_position, true));
+      UpdatePGN(new_position, GetMove(*position, *new_position));
       if (!new_position->outcomes) {
         new_generate_moves(*new_position);
       }
@@ -3584,7 +3476,7 @@ ComplicatedLessOutcome);
 
       //printf("[main thread %d] acquire complete.\n", GetCurrentThreadId());
       if (!mental_chess) {
-        std::cout << MakeString(*new_position, chess_notation, white_on_bottom) << std::endl;
+        std::cout << MakeString(*new_position, white_on_bottom) << std::endl;
         std::cout << "Material evaluation: " << EvaluateMaterial(*new_position) << std::endl;
         std::cout << "Evaluation on depth " << ((new_position->depth <= 0)
             ? "?" : std::to_string(new_position->depth)) << ": "
