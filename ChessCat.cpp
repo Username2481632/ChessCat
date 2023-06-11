@@ -1,3 +1,5 @@
+#include "utils.h"
+
 #include <Windows.h>
 #include <assert.h>
 #include <process.h>
@@ -1286,10 +1288,6 @@ size_t CountMoves(Position& position) {
 
 const char promotion_pieces[4] = {'Q', 'R', 'B', 'N'};
 
-
-int char_to_int(char c) { return (int)c - int('0'); }
-
-size_t char_to_size_t(char c) { return ((size_t)c - (size_t)'0'); }
 
 const std::set<char> pieces = {'K', 'Q', 'R', 'B', 'N'};
 
@@ -3125,15 +3123,6 @@ SeekResult SeekPosition(Position* position, int moves) {
   }
 
 
-}
-
-
-std::string ToLower(std::string input) {
-  std::string output;
-  for (size_t i = 0; i < input.length(); i++) {
-    output += input[i];
-  }
-  return output;
 }
 
 
