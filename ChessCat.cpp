@@ -25,8 +25,8 @@
 #undef min
 #undef max
 
-std::map<char, int> piece_values = {
-    {'P', 1}, {'N', 3}, {'B', 3}, {'R', 5}, {'Q', 9}};
+std::map<char, double> piece_values = {
+    {'P', 1.0}, {'N', 3.0}, {'B', 3.0}, {'R', 5.0}, {'Q', 9.0}};
 const int knight_moves[8] = {-17, -15, -6, 10, 17, 15, 6, -10};
 const int bishop_moves[4] = {-9, -7, 9, 7};
 const int king_moves[8] = {-9, -8, -7, 1, 9, 8, 7, -1};
@@ -41,12 +41,12 @@ std::mutex position_mutex;
 //   PieceType type = PieceType::Empty;
 //   ColorType color = ColorType::White;
 // };
-enum Color { white, black, empty};
+enum class Color : char { White, Black, Empty};
 struct Piece {
   Color color;
   char type;
   
-  bool IsEmpty() const { return color == empty;
+  bool IsEmpty() const { return color == Color::Empty;
   }
   bool operator==(const Piece& other) const {
     return color == other.color && type == other.type;
@@ -62,7 +62,7 @@ struct Piece {
     type = t;
   }
   void Empty() {
-    color = empty;
+    color = Color::Empty;
     type = ' ';
   }
   Piece(const Color& c, const char& t) : color(c), type(t){};
@@ -112,7 +112,7 @@ struct Kings {
   size_t white_king;
   size_t black_king;
   size_t& operator[](const Color& color) {
-    return color == white ? white_king : black_king;
+    return color == Color::White ? white_king : black_king;
   };
   Kings(size_t wk, size_t bk) : white_king(wk), black_king(bk){};
 };
@@ -122,30 +122,30 @@ struct Kings {
  //int boards_destroyed = 0;
 
 Board starting_board = {
-    {Piece(black, 'R'), Piece(black, 'N'), Piece(black, 'B'),
-       Piece(black, 'Q'), Piece(black, 'K'), Piece(black, 'B'),
-       Piece(black, 'N'), Piece(black, 'R'),
-     Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P'),
-       Piece(black, 'P'), Piece(black, 'P'), Piece(black, 'P'),
-       Piece(black, 'P'), Piece(black, 'P'),
-     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' '),
-     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' '),
-     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' '),
-     Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' '), Piece(empty, ' '),
-       Piece(empty, ' '), Piece(empty, ' '),
-     Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P'),
-       Piece(white, 'P'), Piece(white, 'P'), Piece(white, 'P'),
-       Piece(white, 'P'), Piece(white, 'P'),
-     Piece(white, 'R'), Piece(white, 'N'), Piece(white, 'B'),
-       Piece(white, 'Q'), Piece(white, 'K'), Piece(white, 'B'),
-       Piece(white, 'N'), Piece(white, 'R')}};
+    {Piece(Color::Black, 'R'), Piece(Color::Black, 'N'), Piece(Color::Black, 'B'),
+       Piece(Color::Black, 'Q'), Piece(Color::Black, 'K'), Piece(Color::Black, 'B'),
+       Piece(Color::Black, 'N'), Piece(Color::Black, 'R'),
+     Piece(Color::Black, 'P'), Piece(Color::Black, 'P'), Piece(Color::Black, 'P'),
+       Piece(Color::Black, 'P'), Piece(Color::Black, 'P'), Piece(Color::Black, 'P'),
+       Piece(Color::Black, 'P'), Piece(Color::Black, 'P'),
+     Piece(Color::Empty, ' '), Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+       Piece(Color::Empty, ' '), Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+       Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+     Piece(Color::Empty, ' '), Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+       Piece(Color::Empty, ' '), Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+       Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+     Piece(Color::Empty, ' '), Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+       Piece(Color::Empty, ' '), Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+       Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+     Piece(Color::Empty, ' '), Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+       Piece(Color::Empty, ' '), Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+       Piece(Color::Empty, ' '), Piece(Color::Empty, ' '),
+     Piece(Color::White, 'P'), Piece(Color::White, 'P'), Piece(Color::White, 'P'),
+       Piece(Color::White, 'P'), Piece(Color::White, 'P'), Piece(Color::White, 'P'),
+       Piece(Color::White, 'P'), Piece(Color::White, 'P'),
+     Piece(Color::White, 'R'), Piece(Color::White, 'N'), Piece(Color::White, 'B'),
+       Piece(Color::White, 'Q'), Piece(Color::White, 'K'), Piece(Color::White, 'B'),
+       Piece(Color::White, 'N'), Piece(Color::White, 'R')}};
 
 //struct IntPoint {
 //  int row;
@@ -273,9 +273,9 @@ struct Check {
 };
 
 
-void GetCheckInfo(Check& output, Position& position, Color side = empty) {
-  if (side == empty) {
-    side = position.white_to_move ? white : black;
+void GetCheckInfo(Check& output, Position& position, Color side = Color::Empty) {
+  if (side == Color::Empty) {
+    side = position.white_to_move ? Color::White : Color::Black;
   }
   int new_i;
   /*if (!king_present(position)) {
@@ -300,8 +300,8 @@ void GetCheckInfo(Check& output, Position& position, Color side = empty) {
   }*/
   size_t i = (size_t)position.kings[side];
   // pawn check
-  if (side == white) {
-    opponent = black;
+  if (side == Color::White) {
+    opponent = Color::Black;
     // right check
     if (i > 7 && ((i & 7) != 7)) {
       new_i = (int)i - 7;
@@ -321,7 +321,7 @@ void GetCheckInfo(Check& output, Position& position, Color side = empty) {
       }
     }
   } else {
-    opponent = white;
+    opponent = Color::White;
     // right check
     if (i < 55 && ((i & 7) != 7)) {
       new_i = (int)i + 9;
@@ -497,8 +497,8 @@ bool InCheck(Position& position, const Color& side, int ki = -1) {
     i = (size_t)ki;
     }
     // pawn check
-    if (side == white) {
-      opponent = black;
+    if (side == Color::White) {
+      opponent = Color::Black;
       // right check
       if (i > 7 && ((i & 7) != 7)) {
         new_i = (int)i - 7;
@@ -516,7 +516,7 @@ bool InCheck(Position& position, const Color& side, int ki = -1) {
         }
       }
     } else {
-      opponent = white;
+      opponent = Color::White;
       // right check
       if (i < 55 && ((i & 7) != 7)) {
         new_i = (int)i + 9;
@@ -1017,7 +1017,7 @@ bool CheckEnPassantRights(Position& position, size_t i, int new_i, int target, C
 size_t CountPieceMoves(Position& position, size_t& i, const Check& check_info) {
     size_t moves = 0;
     int new_i;
-    Color opponent = position.board[i].color == white ? black : white;
+    Color opponent = position.board[i].color == Color::White ? Color::Black : Color::White;
     switch (position.board[i].type) {
       case 'P': {
         if (check_info.king_must_move) {
@@ -1026,7 +1026,7 @@ size_t CountPieceMoves(Position& position, size_t& i, const Check& check_info) {
         int multiplier;
         size_t promotion_row_a, promotion_row_b, starting_row_a, starting_row_b,
             en_passant_start_a, en_passant_start_b;
-        if (position.board[i].color == white) {
+        if (position.board[i].color == Color::White) {
           multiplier = -8;
           starting_row_a = 48;
           starting_row_b = 55;
@@ -1054,7 +1054,7 @@ size_t CountPieceMoves(Position& position, size_t& i, const Check& check_info) {
           // promotion
           for (size_t k = 0; k < 4; k++) {
           // one square
-          if (position.board[(size_t)new_i].color == empty &&
+          if (position.board[(size_t)new_i].color == Color::Empty &&
               MoveOk(check_info, i, (size_t)new_i)) {
             moves++;
           }
@@ -1068,14 +1068,14 @@ size_t CountPieceMoves(Position& position, size_t& i, const Check& check_info) {
           }
           }
         } else {
-          if (position.board[(size_t)new_i].color == empty) {
+          if (position.board[(size_t)new_i].color == Color::Empty) {
           // one square forward
           if (MoveOk(check_info, i, (size_t)new_i)) {
             moves++;
           }
           // two squares forward
           if (i >= starting_row_a && i <= starting_row_b &&
-              position.board[(size_t)new_i + multiplier].color == empty &&
+              position.board[(size_t)new_i + multiplier].color == Color::Empty &&
               MoveOk(check_info, i, (size_t)new_i + multiplier)) {
             moves++;
           }
@@ -1209,19 +1209,19 @@ size_t CountPieceMoves(Position& position, size_t& i, const Check& check_info) {
           //}
           }
         }
-        if ((position.board[i].color == white ? position.castling.white_o_o
+        if ((position.board[i].color == Color::White ? position.castling.white_o_o
                                     : position.castling.black_o_o) &&
-            position.board[i + 1].color == empty &&
-            position.board[i + 2].color == empty && !check_info.in_check &&
+            position.board[i + 1].color == Color::Empty &&
+            position.board[i + 2].color == Color::Empty && !check_info.in_check &&
             !InCheck(position, position.board[i].color, (int)i + 1) &&
             !InCheck(position, position.board[i].color, (int)i + 2)) {
           moves++;
         }
-        if ((position.board[i].color == white ? position.castling.white_o_o_o
+        if ((position.board[i].color == Color::White ? position.castling.white_o_o_o
                                     : position.castling.black_o_o_o) &&
-            position.board[i - 1].color == empty &&
-            position.board[i - 2].color == empty &&
-            position.board[i - 3].color == empty && !check_info.in_check &&
+            position.board[i - 1].color == Color::Empty &&
+            position.board[i - 2].color == Color::Empty &&
+            position.board[i - 3].color == Color::Empty && !check_info.in_check &&
             !InCheck(position, position.board[i].color, (int)i - 1) &&
             !InCheck(position, position.board[i].color, (int)i - 2)) {
           moves++;
@@ -1242,7 +1242,7 @@ size_t CountMoves(Position& position) {
   size_t moves = 0;
   Check& check_info = white_check;
   for (size_t i = 0; i <= 63; i++) {
-      if (position.board[i].color == empty) {
+      if (position.board[i].color == Color::Empty) {
         continue;
       }
       if (position.board[i].type == 'K') {
@@ -1255,7 +1255,7 @@ size_t CountMoves(Position& position) {
         }
         continue;
       }
-      if (position.board[i].color == white) {
+      if (position.board[i].color == Color::White) {
         check_info = white_check;
       } else {
         check_info = black_check;
@@ -1320,7 +1320,7 @@ bool board_exists(const Position& position, const Position& new_position) {
 void new_generate_moves(Position& position) {
   Position base_position = position.GenerateMovesCopy();
   // base_position.previous_move = &position;
-  Color opponent = position.white_to_move ? black : white;
+  Color opponent = position.white_to_move ? Color::Black : Color::White;
   Position* new_position;
   size_t moves = 0;
   if (position.outcomes == nullptr) {
@@ -1331,11 +1331,11 @@ void new_generate_moves(Position& position) {
 
   int new_i;
   for (size_t i = 0; i < 63; i++) {
-    if (position.board[i].color == empty) {
+    if (position.board[i].color == Color::Empty) {
       continue;
     }
     moves = 0;
-    if (position.board[i].color == (position.white_to_move ? black : white)) {
+    if (position.board[i].color == (position.white_to_move ? Color::Black : Color::White)) {
       
 
       moves = CountPieceMoves(position, i, check_info);
@@ -1364,7 +1364,7 @@ void new_generate_moves(Position& position) {
       }
       continue;
     }
-    int evaluation_multiplier = position.board[i].color == white ? 1 : -1;
+    int evaluation_multiplier = position.board[i].color == Color::White ? 1 : -1;
     switch (position.board[i].type) {
       case 'P': {
           if (check_info.king_must_move) {
@@ -1373,7 +1373,7 @@ void new_generate_moves(Position& position) {
           int multiplier;
           size_t starting_row_a,
               starting_row_b, en_passant_start_a, en_passant_start_b;
-          if (position.board[i].color == white) {
+          if (position.board[i].color == Color::White) {
           multiplier = -8;
           starting_row_a = 48;
           starting_row_b = 55;
@@ -1398,7 +1398,7 @@ void new_generate_moves(Position& position) {
           // promotion
           for (size_t k = 0; k < 4; k++) {
             // one square
-            if (position.board[(size_t)new_i].color == empty &&
+            if (position.board[(size_t)new_i].color == Color::Empty &&
                 MoveOk(check_info, i, (size_t)new_i)) {
               new_position = base_position.CreateDeepCopy();
               new_position->board[(size_t)new_i].color =
@@ -1421,7 +1421,7 @@ void new_generate_moves(Position& position) {
               if (position.white_to_move) {
                 new_position->evaluation +=
                     (piece_values[position.board[(size_t)new_i - 1].type]) +
-                    piece_values[promotion_pieces[k]] - 1;
+                    piece_values[promotion_pieces[k]] - 1.0;
               } else {
                 new_position->evaluation -=
                     (piece_values[position.board[(size_t)new_i - 1].type]) +
@@ -1452,7 +1452,7 @@ void new_generate_moves(Position& position) {
             }
           }
           } else {
-          if (position.board[(size_t)new_i].color == empty) {
+          if (position.board[(size_t)new_i].color == Color::Empty) {
             // one square forward
             if (MoveOk(check_info, i, (size_t)new_i)) {
               new_position = base_position.CreateDeepCopy();
@@ -1464,7 +1464,7 @@ void new_generate_moves(Position& position) {
             }
             // two squares forward
             if (i >= starting_row_a && i <= starting_row_b &&
-                position.board[(size_t)new_i + multiplier].color == empty &&
+                position.board[(size_t)new_i + multiplier].color == Color::Empty &&
                 MoveOk(check_info, i, (size_t)new_i + multiplier)) {
               new_position = base_position.CreateDeepCopy();
               new_position->board[(size_t)new_i + multiplier] =
@@ -1631,16 +1631,16 @@ void new_generate_moves(Position& position) {
               new_position = base_position.CreateDeepCopy();
               new_position->board[(size_t)new_i] = position.board[i];
               new_position->board[i].Empty();
-              if (position.board[63].Equals(white, 'R') &&
+              if (position.board[63].Equals(Color::White, 'R') &&
                   new_position->board[63].IsEmpty()) {
                 new_position->castling.white_o_o = false;
-              } else if (position.board[56].Equals(white, 'R') &&
+              } else if (position.board[56].Equals(Color::White, 'R') &&
                          new_position->board[56].IsEmpty()) {
                 new_position->castling.white_o_o_o = false;
-              } else if (position.board[7].Equals(white, 'R') &&
+              } else if (position.board[7].Equals(Color::White, 'R') &&
                          new_position->board[7].IsEmpty()) {
                 new_position->castling.black_o_o = false;
-              } else if (position.board[0].Equals(white, 'R') &&
+              } else if (position.board[0].Equals(Color::White, 'R') &&
                          new_position->board[0].IsEmpty()) {
                 new_position->castling.black_o_o_o = false;
               }
@@ -1711,8 +1711,8 @@ void new_generate_moves(Position& position) {
           }
           if ((position.white_to_move ? position.castling.white_o_o
                                       : position.castling.black_o_o) &&
-              position.board[i + 1].color == empty &&
-              position.board[i + 2].color == empty && !check_info.in_check &&
+              position.board[i + 1].color == Color::Empty &&
+              position.board[i + 2].color == Color::Empty && !check_info.in_check &&
               !InCheck(position, position.board[i].color, (int)i + 1) &&
               !InCheck(position, position.board[i].color, (int)i + 2)) {
           new_position = base_position.CreateDeepCopy();
@@ -1733,9 +1733,9 @@ void new_generate_moves(Position& position) {
           }
           if ((position.white_to_move ? position.castling.white_o_o_o
                                       : position.castling.black_o_o_o) &&
-              position.board[i - 1].color == empty &&
-              position.board[i - 2].color == empty &&
-              position.board[i - 3].color == empty && !check_info.in_check &&
+              position.board[i - 1].color == Color::Empty &&
+              position.board[i - 2].color == Color::Empty &&
+              position.board[i - 3].color == Color::Empty && !check_info.in_check &&
               !InCheck(position, position.board[i].color, (int)i - 1) &&
               !InCheck(position, position.board[i].color, (int)i - 2)) {
           new_position = base_position.CreateDeepCopy();
@@ -1743,7 +1743,7 @@ void new_generate_moves(Position& position) {
           new_position->board[i - 1].set(position.board[i].color, 'R');
           new_position->board[i - 4].Empty();
           new_position->board[i].Empty();
-          new_position->kings[position.white_to_move ? white : black] = i - 2;
+          new_position->kings[position.white_to_move ? Color::White : Color::Black] = i - 2;
           if (position.white_to_move) {
             new_position->castling.white_o_o =
                 new_position->castling.white_o_o_o = false;
@@ -1808,14 +1808,14 @@ Board GetBoard(Move info, Position& position) {
   Board board = position.board;
   Check check_info;
   GetCheckInfo(check_info, position);
-  Color to_move = position.white_to_move ? white : black;
+  Color to_move = position.white_to_move ? Color::White : Color::Black;
   size_t count = 0;
   size_t found = 64;
   switch (info.piece) {
     case 'P': {
-      int multiplier = to_move == white ? -8 : 8;
+      int multiplier = to_move == Color::White ? -8 : 8;
       if (info.capture) {
-        if (board[info.dest].color == empty) {
+        if (board[info.dest].color == Color::Empty) {
           // en passant
           board[info.dest] = board[(((size_t)info.dest - multiplier) & (-8)) +
                                    (size_t)info.start[1]];
@@ -1960,13 +1960,13 @@ Position* MoveToPosition(Position& position, const std::string& move) {
   Board new_board = position.board;
   if (move == "0-0" || move == "O-O") {
     if (position.white_to_move) {
-      new_board[62].set(white, 'K');
-      new_board[61].set(white, 'R');
+      new_board[62].set(Color::White, 'K');
+      new_board[61].set(Color::White, 'R');
       new_board[60].Empty();
       new_board[63].Empty();
     } else {
-      new_board[6].set(black, 'K');
-      new_board[5].set(black, 'R');
+      new_board[6].set(Color::Black, 'K');
+      new_board[5].set(Color::Black, 'R');
       new_board[4].Empty();
       new_board[7].Empty();
     }
@@ -1974,13 +1974,13 @@ Position* MoveToPosition(Position& position, const std::string& move) {
   }
   if (move == "O-O-O" || move == "0-0-0") {
     if (position.white_to_move) {
-      new_board[58].set(white, 'K');
-      new_board[59].set(white, 'R');
+      new_board[58].set(Color::White, 'K');
+      new_board[59].set(Color::White, 'R');
       new_board[60].Empty();
       new_board[56].Empty();
     } else {
-      new_board[2].set(black, 'K');
-      new_board[3].set(black, 'R');
+      new_board[2].set(Color::Black, 'K');
+      new_board[3].set(Color::Black, 'R');
       new_board[4].Empty();
       new_board[0].Empty();
     }
@@ -2045,13 +2045,13 @@ std::string MakeString(const Position& position, const bool& white_on_bottom) {
       char color;
 
         switch (position.board[i].color) {
-          case white:
+          case Color::White:
             color = 'W';
             break;
-          case black:
+          case Color::Black:
             color = 'B';
             break;
-          case empty:
+          case Color::Empty:
             color = ' ';
             break;
           default:
@@ -2074,13 +2074,13 @@ std::string MakeString(const Position& position, const bool& white_on_bottom) {
         char color;
         
         switch (position.board[(size_t)i].color) {
-          case white:
+          case Color::White:
             color = 'W';
             break;
-          case black:
+          case Color::Black:
             color = 'B';
             break;
-          case empty:
+          case Color::Empty:
             color = ' ';
             break;
           default:
@@ -2142,13 +2142,13 @@ bool LessOutcome(const Position* position1, const Position* position2) {
   //}
   //return false;
 }
-int EvaluateMaterial(const Position& position) {
-  int material = 0;
+double EvaluateMaterial(const Position& position) {
+  double material = 0;
   for (size_t i = 0; i < 64; i++) {
-    if (position.board[i].color == empty || position.board[i].type == 'K') {
+    if (position.board[i].color == Color::Empty || position.board[i].type == 'K') {
     continue;
     }
-    if (position.board[i].color == white) {
+    if (position.board[i].color == Color::White) {
     material += piece_values[position.board[i].type];
     } else {
     material -= piece_values[position.board[i].type];
@@ -2257,7 +2257,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
 
   if (position.outcomes->size() == 0) {
     position.depth = 1000;
-    if (InCheck(position, position.white_to_move ? white : black)) {
+    if (InCheck(position, position.white_to_move ? Color::White : Color::Black)) {
        position.evaluation =
            position.white_to_move
                ? (double)-mate + (double)position.number
@@ -2291,9 +2291,6 @@ void minimax(Position& position, int depth, double alpha, double beta,
 
   std::sort(position.outcomes->begin(), position.outcomes->end(),
             position.white_to_move ? GreaterOutcome : LessOutcome);
-  if (depth == 0 && h) {
-     int hirello;
-  }
   if (depth == 0 &&
       position.outcomes->back()->evaluation == initial_evaluation) {
      //initial_evaluation = position.evaluation;
@@ -2464,10 +2461,10 @@ std::vector<Position*> GetLine(Position* position) {
 
 int CheckGameOver(Position* position) {
   if (position->outcomes->size() == 0) {
-    if (position->white_to_move && InCheck(*position, white)) {
+    if (position->white_to_move && InCheck(*position, Color::White)) {
       return -1;
     }
-    if (!position->white_to_move && InCheck(*position, black)) {
+    if (!position->white_to_move && InCheck(*position, Color::Black)) {
       return 1;
     }
     return 0;
@@ -2511,7 +2508,7 @@ void SearchPosition(Position* position, int minimum_depth, bool* stop) {
       alpha = position->evaluation - aspiration_window;
       beta = position->evaluation + aspiration_window;
     } else {
-      alpha = INT_MIN;
+      alpha = std::numeric_limits<double>::lowest();
       beta = INT_MAX;
     }
     minimax(*position, depth, alpha, beta,
@@ -2552,8 +2549,8 @@ void calculate_moves(void* varg) {
             alpha = input->position->evaluation - aspiration_window;
             beta = input->position->evaluation + aspiration_window;
           } else {
-            alpha = INT_MIN;
-            beta = INT_MAX;
+            alpha = std::numeric_limits<double>::lowest();
+            beta = DBL_MAX;
           }
           minimax(*input->position, input->position->depth + 1, alpha, beta, input->stop);
           if (input->position->evaluation <= alpha) {
@@ -2645,20 +2642,20 @@ std::string GetMove(Position& position1, Position& position2) {
   }
   if (differences.size() == 4) { // optimization: use position1 catling rights != position2 castling rights
     if ((position2.board[62].type == 'K' &&
-        position1.board[62].color == empty) || (position2.board[6].type == 'K' &&
-        position1.board[6].color == empty)) {
+        position1.board[62].color == Color::Empty) || (position2.board[6].type == 'K' &&
+        position1.board[6].color == Color::Empty)) {
       return "O-O";
     }
     if ((position2.board[58].type == 'K' &&
-        position1.board[58].color == empty) || (position2.board[2].type == 'K' &&
-        position1.board[2].color == empty)) {
+        position1.board[58].color == Color::Empty) || (position2.board[2].type == 'K' &&
+        position1.board[2].color == Color::Empty)) {
       return "O-O-O";
     }
   }
   if (differences.size() == 3) {
     if (position2
             .board[(size_t)differences[0]]
-      .color == empty) {
+      .color == Color::Empty) {
         return std::string({char('a' + (((differences[1] == differences[0] + 8)
                                              ? differences[2]
                                              : differences[1]) &
@@ -2677,7 +2674,7 @@ std::string GetMove(Position& position1, Position& position2) {
     
   }
   size_t origin, dest;
-  if (position2.board[differences[0]].color == empty) {
+  if (position2.board[differences[0]].color == Color::Empty) {
     origin = differences[0];
     dest = differences[1];
   } else {
@@ -2692,7 +2689,7 @@ std::string GetMove(Position& position1, Position& position2) {
   std::vector<size_t> found;
   switch (position1.board[origin].type) {
     case 'P':
-      if (position1.board[dest].color != empty) {
+      if (position1.board[dest].color != Color::Empty) {
         // capture
         output << (char) ('a' + (origin & 7)) << 'x' << char('a' + (dest & 7))
                << (8 - (dest >> 3));
@@ -2733,7 +2730,7 @@ std::string GetMove(Position& position1, Position& position2) {
           output << static_cast<char>('a' + (origin & 7)) << (origin >> 3);
         }
       }
-      if (position1.board[dest].color != empty) {
+      if (position1.board[dest].color != Color::Empty) {
         output << 'x';
       }
       output << char('a' + (dest & 7)) << (8 - (dest >> 3));
@@ -2748,11 +2745,11 @@ std::string GetMove(Position& position1, Position& position2) {
           continue;
         }
         while (true) {
-          if (position1.board[(size_t)new_i].color == (position2.white_to_move ? white : black)) {
+          if (position1.board[(size_t)new_i].color == (position2.white_to_move ? Color::White : Color::Black)) {
             break;
           }
           if (position1.board[(size_t)new_i].color ==
-                  (position1.white_to_move ? white : black)&&
+                  (position1.white_to_move ? Color::White : Color::Black)&&
               position1.board[(size_t)new_i].type ==
                   position1.board[origin].type &&
               (new_i != (int)origin) &&
@@ -2785,7 +2782,7 @@ std::string GetMove(Position& position1, Position& position2) {
           }
         }
         if (position1.board[dest].color !=
-            empty) {
+            Color::Empty) {
           output << 'x';
         }
         output << (char)('a' + (dest & 7)) << (8 - (dest >> 3));
@@ -2805,11 +2802,11 @@ std::string GetMove(Position& position1, Position& position2) {
         }
         while (true) {
           if (position1.board[(size_t)new_i].color ==
-              (position2.white_to_move ? white : black)) {
+              (position2.white_to_move ? Color::White : Color::Black)) {
             break;
           }
           if (position1.board[(size_t)new_i].color ==
-                  (position1.white_to_move ? white : black) &&
+                  (position1.white_to_move ? Color::White : Color::Black) &&
               position1.board[(size_t)new_i].type ==
                   position1.board[origin].type &&
               (size_t)new_i != origin &&
@@ -2853,14 +2850,14 @@ std::string GetMove(Position& position1, Position& position2) {
           output << char('a' + (origin&7)) << (8 - (origin>>3));
         }
       }
-      if (position1.board[dest].color != empty) {
+      if (position1.board[dest].color != Color::Empty) {
         output << 'x';
       }
       output << (char)('a' + (dest & 7)) << (8 - (dest >> 3));
       break;
     case 'K':
       output << 'K';
-      if (position1.board[dest].color != empty) {
+      if (position1.board[dest].color != Color::Empty) {
         output << 'x';
       }
       output << (char)('a' + (dest & 7)) << (8 - (dest >> 3));
@@ -2871,7 +2868,7 @@ std::string GetMove(Position& position1, Position& position2) {
   }
   if (std::abs(position2.evaluation) == (position2.white_to_move ? (mate - position2.number) : (-mate + position2.number))) {
     output << '#';
-  } else if (InCheck(position2, position2.white_to_move ? white : black)) {
+  } else if (InCheck(position2, position2.white_to_move ? Color::White : Color::Black)) {
     output << '+';
   }
   return output.str();
@@ -2907,9 +2904,9 @@ std::stringstream elements_line(FEN);
       }
     } else {
       if (islower(elements[0][k])) {
-        position.board[i].color = white;
+        position.board[i].color = Color::White;
       } else {
-        position.board[i].color = white;
+        position.board[i].color = Color::White;
       }
       position.board[i].type = (char)toupper(elements[0][k]);
       i++;
@@ -3141,10 +3138,10 @@ std::string ToLower(std::string input) {
 
 
 
-int CountMaterial(const Position& position) {
-  int count = 0;
+double CountMaterial(const Position& position) {
+  double count = 0;
   for (size_t i = 0; i < 64; i++) {
-      if (position.board[i].color != empty) {
+      if (position.board[i].color != Color::Empty) {
         if (position.board[i].type == 'K') {
           count += 4;
         } else {
@@ -3394,7 +3391,7 @@ ComplicatedLessOutcome);
           }
           std::cout/* << "[finished line]"*/ << std::endl;
           std::cout << "Moves: " << best_move->outcomes->size() << std::endl
-                    << "Material: " << (float) CountMaterial(*best_move) / 2.0 << std::endl;
+                    << "Material: " << CountMaterial(*best_move) / 2.0 << std::endl;
         }
         position = best_move;
         if (game_status != 2) {
