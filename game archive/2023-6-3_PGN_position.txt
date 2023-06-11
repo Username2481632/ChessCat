@@ -1,0 +1,9 @@
+[Event "?"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "Michael + Nikita"]
+[Black "ChessCat"]
+[Result "*"]
+
+1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd4 4. Nf3 Qg4 5. h3 Qe6+ 6. Be2 Bd7 7. O-O Qd6 8. d4 Na6 9. Bxa6 Qxa6 10. Bf4 Qa5 11. Qe1 Nf6 12. Qe2 Qb4 13. b3 Qxc3 14. Qd2 Qxd2 15. Nxd2 Nd5 16. Bg3 Kd8 17. c4 Nb4 18. d5 Nc2 19. Rac1 Nb4 20. a4 h5 21. h4 e5 22. dxe6 fxe6 23. Ne4 Be7 24. a5 Rg8 25. Ra1 Nd3 26. a6 Rb8 27. axb7 Rxb7 28. Rfd1 Nc5 29. Nd2 Rf8 30. b4 Nd3 31. b5 e5 32. f3 Bc5+ 33. Kh1 Nf2+ 34. Bxf2 Bxf2 35. Ne4 Bd4 36. Ra5 Rf4 37. Kh2 Rxh4+ 38. Kg3 Rf4 39. Rb1 Bf5 40. Re1 Rb6 41. Rxa7 Rg6+ *
