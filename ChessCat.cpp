@@ -48,10 +48,8 @@ using MovesType = std::vector<Pair>;
 
 
 bool MoveOk(Check check, size_t i, size_t new_i) {
-  return ((check.in_check ? check.block.count(new_i)
-          : true) && (check.pinned.contains(i)
-              ? check.pinned[i].contains(new_i)
-              : true));
+  return ((!check.in_check || check.block.contains(new_i)) && (!check.pinned.contains(i)
+              ||check.pinned[i].contains(new_i)));
 }
 
 
@@ -910,7 +908,7 @@ void new_generate_moves(Position& position) {
   GetCheckInfo(check_info, position);
 
   int new_i;
-  for (size_t i = 0; i < 63; i++) {
+  for (size_t i = 0; i < 64; i++) {
     if (position.board[i].color == Color::Empty) {
       continue;
     }
@@ -1393,7 +1391,7 @@ Board GetBoard(Move info, Position& position) {
   size_t found = 64;
   switch (info.piece) {
     case 'P': {
-      int multiplier = to_move == Color::White ? -8 : 8;
+      int64_t multiplier = (to_move == Color::White) ? (-8) : 8;
       if (info.capture) {
         if (board[info.dest].color == Color::Empty) {
           // en passant
@@ -1404,17 +1402,18 @@ Board GetBoard(Move info, Position& position) {
               .Empty();
           board[info.dest - multiplier].Empty();
         } else {
-          board[(size_t)info.dest] = board[(size_t)info.dest - multiplier];
-          board[(((size_t)info.dest - multiplier) & (-8)) + (size_t)info.start[1]].Empty();
+          board[(size_t)info.dest] =
+              board[(size_t)(((int)info.dest - multiplier) & (-8)) + (size_t)info.start[1]];
+          board[(size_t)(((int)info.dest - multiplier) & (-8)) + (size_t)info.start[1]].Empty();
         }
-      } else if (board[(size_t)info.dest - multiplier].type ==
+      } else if (board[info.dest - multiplier].type ==
                  'P') {
         board[info.dest] =
             board[info.dest - multiplier];
         board[info.dest - multiplier].Empty();
       } else {
-        board[info.dest] = board[info.dest - (size_t)(multiplier * 2)];
-        board[info.dest - (size_t)(multiplier * 2)].Empty();
+        board[info.dest] = board[info.dest - (multiplier * 2)];
+        board[info.dest - (multiplier << 1)].Empty();
       }
       if (info.promotion != ' ') {
         board[info.dest].type = info.promotion;
@@ -1450,13 +1449,21 @@ Board GetBoard(Move info, Position& position) {
           continue;
         }
         while (true) {
-          if ((board[(size_t)i].type == 'B' || board[(size_t)i].type == 'Q') &&
+          if (board[(size_t)i].color ==
+              (position.white_to_move ? Color::Black : Color::White)) {
+            break;
+          }
+          if ((board[(size_t)i].type == info.piece) &&
               board[(size_t)i].color == to_move &&
               (info.start[0] == -1 || ((i >> 3) == info.start[0])) &&
               (info.start[1] == -1 || ((i & 7) == info.start[1]))&&
               MoveOk(check_info, (size_t)i, info.dest)) {
             found = (size_t)i;
             count++;
+          }
+          if (board[(size_t)i].color ==
+              (position.white_to_move ? Color::White : Color::Black)) {
+            break;
           }
           if (i <= 8 || i >= 55 || (i & 7) == 7 ||
               (i & 7) == 0) {
@@ -1483,13 +1490,21 @@ Board GetBoard(Move info, Position& position) {
           continue;
         }
         while (true) {
-          if ((board[(size_t)i].type == 'R' || board[(size_t)i].type == 'Q') &&
+          if (board[(size_t)i].color ==
+              (position.white_to_move ? Color::Black : Color::White)) {
+            break;
+          }
+          if ((board[(size_t)i].type == info.piece) &&
               board[(size_t)i].color == to_move &&
               (info.start[0] == -1 || ((i >> 3) == info.start[0])) &&
               (info.start[1] == -1 || ((i & 7) == info.start[1]))&&
               MoveOk(check_info, (size_t)i, info.dest)) {
             found = (size_t)i;
             count++;
+          }
+          if (board[(size_t)i].color ==
+              (position.white_to_move ? Color::White : Color::Black)) {
+            break;
           }
           if (k == 0) {
             if (i <= 7) {
@@ -1567,7 +1582,7 @@ Position* MoveToPosition(Position& position, const std::string& move) {
     return FindPosition(new_board, position);
   }
   Move info;
-  int current = (int)move.length() - 1;
+  int64_t current = (int64_t)move.length() - 1;
   if (pieces.count(move[0])) {
     info.piece = move[0];
   } else {
@@ -1585,9 +1600,9 @@ Position* MoveToPosition(Position& position, const std::string& move) {
     info.checkmate = true;
     current--;
   }
-  info.dest = size_t(8 * (8 - char_to_int(move[(size_t)current])));
+  info.dest = 8UL * (8UL - char_to_size_t(move[(size_t)current]));
   current--;
-  info.dest += size_t(move[(size_t)current] - 'a');
+  info.dest += ((size_t)move[(size_t)current] - (size_t)'a');
   current--;
   if (current == -1) {
     return FindPosition(GetBoard(info, position), position);
@@ -1669,7 +1684,7 @@ std::string MakeString(const Position& position, const bool& white_on_bottom) {
         }
         result << ' ' << color << position.board[(size_t)i].type
                << " |";
-        if (((i + 1) & 7) == 0) {
+        if ((i & 7) == 0) {
           result << '\n';
         }
     }
@@ -2746,11 +2761,22 @@ void LogGameEnd(const Position& position, const int &game_status) {
   }
 }
 
-const int max_positions = 2600000;
+const int max_positions = 3000000;
 
 void UpdateMinDepth(Position& position) {
+  if (!position.outcomes) {
+    new_generate_moves(position);
+  }
+  double branching_factor = (double)CountMoves(position) / 2.0;
+  double material = round(position.evaluation);
+  for (size_t i = 0; i < position.outcomes->size(); i++) {
+    if (EvaluateMaterial(*(*position.outcomes)[i]) != material) {
+      branching_factor++;
+    }
+  }
+
   min_depth = (int)std::max(
-      4.0, round(log2(max_positions) / log2((double)CountMoves(position) / 2.0)));
+      4.0, round(log2(max_positions) / (log2(branching_factor))));
 }
 
 int main() {
