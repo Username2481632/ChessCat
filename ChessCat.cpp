@@ -2294,7 +2294,9 @@ void SearchPosition(Position* position, int minimum_depth, bool* stop) {
   if (!position->outcomes) {
     new_generate_moves(*position);
   }
-  while (depth <= minimum_depth && !*stop && CheckGameOver(position) == 2) {
+  while (depth <= minimum_depth && !*stop && CheckGameOver(position) == 2 &&
+         (position->white_to_move ? (position->evaluation < ((double)mate / 2.0)) :
+         position->evaluation > (double)-mate / 2.0)) {
     if (depth > 2) {
       alpha = position->evaluation - alpha_aspiration_window;
       beta = position->evaluation + beta_aspiration_window;
@@ -2317,7 +2319,7 @@ void SearchPosition(Position* position, int minimum_depth, bool* stop) {
       depth++;
     }
   }
-  assert(*stop || GetBestMove(position)->depth != -1);
+ // assert(*stop || GetBestMove(position)->depth != -1);
 }
 
 
@@ -2365,7 +2367,10 @@ void calculate_moves(void* varg) {
         done_cv.notify_one();
 
       } else {
-        while (!*input->stop) {
+        while (!*input->stop && std::any_of(input->position->outcomes->begin(), input->position->outcomes->end(), [](Position* position){
+          return (position->white_to_move ? (position->evaluation < (double)mate / 2.0) :
+        ( position->evaluation > (double)-mate / 2.0));
+                            })) {
           for (size_t i = 0;
                i < input->position->outcomes->size() && !*input->stop; i++) {
             SearchPosition(
@@ -2662,7 +2667,7 @@ std::string GetMove(Position& position1, Position& position2) {
 
 
   }
-  if (std::abs(position2.evaluation) == (position2.white_to_move ? (mate - position2.number) : (-mate + position2.number))) {
+  if (position2.evaluation == (position1.white_to_move ? (mate - position2.number) : (-mate + position2.number))) {
     output << '#';
   } else if (InCheck(position2, position2.white_to_move ? Color::White : Color::Black)) {
     output << '+';
@@ -3093,7 +3098,7 @@ int main() {
   std::cout << "What color is on the bottom of the board? ";
   std::cin >> bottom_board;
   bool white_on_bottom = bottom_board == 'W' || bottom_board == 'w';
-
+  const std::regex move_input_regex(R"regex([Oo0]-[Oo0](-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](\=[QRBN])?[+#]?)regex");
   ThreadInfo* info = new ThreadInfo(position, new bool(false), new TrashType, color);
   std::string move;
   Board new_board = position->board;
@@ -3257,7 +3262,8 @@ ComplicatedLessOutcome);
       waiting.acquire();
 
       if (!mental_chess) {
-            std::cout << MakeString(*new_position, white_on_bottom) << std::endl;
+            std::cout << MakeString(*new_position, white_on_bottom)
+                      << std::endl;
             std::cout << Convert(new_position->evaluation) << std::endl;
       }
       game_over = false;
@@ -3270,6 +3276,8 @@ ComplicatedLessOutcome);
       stop_cv.notify_one();
       continue;
     } else if (game_over) {
+      new_position = nullptr;
+    } else if (!std::regex_match(move, move_input_regex)) {
       new_position = nullptr;
     } else {
       new_position = MoveToPosition(*position, move);
