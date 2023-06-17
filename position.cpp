@@ -5,7 +5,7 @@
 Position::Position(bool wtm, int n, double e, Board b,
                    Castling c /*, time_t t*/, std::vector<Position*>* o,
                    Position* pm, int d,
-                   /*Position* bm,*/ Kings k, int ept, size_t fmc)
+                   /*Position* bm,*/ Kings k, int ept, size_t fmc, bool wc)
     : white_to_move(wtm),
       number(n),
       evaluation(e),
@@ -18,15 +18,15 @@ Position::Position(bool wtm, int n, double e, Board b,
       // best_move(bm),
       kings(k),
       en_passant_target(ept),
-      fifty_move_rule(fmc) {
+      fifty_move_rule(fmc),was_capture(wc) {
   // boards_created++;
 }
 
 // static
 Position* Position::StartingPosition() {
     return new Position(true, 0, 0.0, starting_board,
-                        Castling(true, true, true, true), nullptr, nullptr, 0,
-                        Kings(60, 4), -1, 0);
+                        Castling(true, true, true, true), nullptr, nullptr, -1,
+                        Kings(60, 4), -1, 0, false);
 }
 
 Position Position::GenerateMovesCopy() {
@@ -34,7 +34,7 @@ Position Position::GenerateMovesCopy() {
                     castling, nullptr /* outcomes */, this /* previous_move */,
                     -1 /*depth*/, /*
 nullptr /* best_move */
-                    /*, */ kings, -1, fifty_move_rule + 1);
+                    /*, */ kings, -1, fifty_move_rule + 1, false);
 }
 
 Position::~Position() {
@@ -54,7 +54,7 @@ Position* Position::CreateDeepCopy() {
         new Position(white_to_move, number, evaluation, board, castling,
                      nullptr /* outcomes */, previous_move /* previous_move */,
                      depth /*,
-nullptr */ /* best_move */, kings, en_passant_target, fifty_move_rule);
+nullptr */ /* best_move */, kings, en_passant_target, fifty_move_rule, was_capture);
     return new_position;
 }
 
@@ -63,7 +63,7 @@ Position* Position::RealDeepCopy() const {  // previous move is not a deep copy
         new Position(white_to_move, number, evaluation, board,
                      castling /*, time*/, nullptr /* outcomes */,
                      previous_move /* previous_move */, depth /*,
-nullptr */ /* best_move */, kings, en_passant_target, fifty_move_rule);
+nullptr */ /* best_move */, kings, en_passant_target, fifty_move_rule, was_capture);
 
     if (outcomes) {
       new_position->outcomes = new std::vector<Position*>;

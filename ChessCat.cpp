@@ -967,7 +967,7 @@ void new_generate_moves(Position& position) {
           bool left_capture =
               ((i & 7) != 0) &&
               position.board[i + multiplier - 1].color == opponent;
-          assert((i + multiplier + 1) <= 63);
+          //assert((i + multiplier + 1) <= 63);
           bool right_capture =
               ((i & 7) != 7) &&
               position.board[i + multiplier + 1].color == opponent;
@@ -996,6 +996,7 @@ void new_generate_moves(Position& position) {
               new_position->board[(size_t)new_i - 1].type = promotion_pieces[k];
               new_position->board[i].Empty();
               new_position->fifty_move_rule = 0;
+              new_position->was_capture = true;
               if (position.white_to_move) {
                 new_position->evaluation +=
                     (piece_values[position.board[(size_t)new_i - 1].type]) +
@@ -1016,6 +1017,7 @@ void new_generate_moves(Position& position) {
               new_position->board[(size_t)new_i + 1].type = promotion_pieces[k];
               new_position->board[i].Empty();
               new_position->fifty_move_rule = 0;
+              new_position->was_capture = true;
               if (position.white_to_move) {
                 new_position->evaluation +=
                     (piece_values[position.board[(size_t)new_i + 1].type]) +
@@ -1098,6 +1100,7 @@ void new_generate_moves(Position& position) {
               new_position->board[i - 1].Empty();
               new_position->evaluation += evaluation_multiplier;
               new_position->fifty_move_rule = 0;
+              new_position->was_capture = true;
               moves++;
               position.outcomes->emplace_back(new_position);
            
@@ -1114,6 +1117,7 @@ void new_generate_moves(Position& position) {
               new_position->board[i].Empty();
               new_position->board[i + 1].Empty();
               new_position->evaluation += position.white_to_move ? 1 : -1;
+              new_position->was_capture = true;
               new_position->fifty_move_rule = 0;
               moves++;
               position.outcomes->emplace_back(new_position);
@@ -1138,6 +1142,7 @@ void new_generate_moves(Position& position) {
               new_position->evaluation +=
                   (evaluation_multiplier *
                    piece_values[position.board[(size_t)new_i].type]);
+              new_position->was_capture = true;
               new_position->fifty_move_rule = 0;
             }
             moves++;
@@ -1171,6 +1176,7 @@ void new_generate_moves(Position& position) {
                 new_position->evaluation +=
                     (evaluation_multiplier *
                      piece_values[position.board[(size_t)new_i].type]);
+                new_position->was_capture = true;
               }
               moves++;
               position.outcomes->emplace_back(new_position);
@@ -1227,6 +1233,7 @@ void new_generate_moves(Position& position) {
                 new_position->evaluation +=
                     (evaluation_multiplier *
                      piece_values[position.board[(size_t)new_i].type]);
+                new_position->was_capture = true;
               }
               moves++;
               position.outcomes->emplace_back(new_position);
@@ -1279,6 +1286,7 @@ void new_generate_moves(Position& position) {
               new_position->evaluation +=
                   (evaluation_multiplier *
                    piece_values[position.board[(size_t)new_i].type]);
+              new_position->was_capture = true;
             }
             moves++;
             position.outcomes->emplace_back(new_position);
@@ -1815,13 +1823,16 @@ const uint64_t max_bytes = (1 << 30) * (uint64_t)16;
 //const int deepening_depth = 2;
 
 //int reasonability_limit = 8;
-
+//using AlphaBeta = std::vector<std::pair<Position*, std::array<int, 2>>>;
 
 void minimax(Position& position, int depth, double alpha, double beta,
-             bool* stop/*, bool reasonable_extension*//*, bool selective_deepening*//*, int initial_material*/) {
+             bool* stop/*, bool reasonable_extension*//*, bool selective_deepening*//*, int initial_material*//*, AlphaBeta alpha_beta*/) {
   if (*stop || position.depth >= depth) {
      return;
   }
+  double initial_alpha = alpha;
+  double initial_beta = beta;
+  //alpha_beta.emplace_back(& position, std::array<int, 2>{INT_MIN, INT_MAX});
   if (position.fifty_move_rule >= 6) {
      int occurrences = 1;
      Position* previous_move = &position;
@@ -1841,13 +1852,9 @@ void minimax(Position& position, int depth, double alpha, double beta,
   
   }
   double initial_evaluation = position.evaluation;
-  bool h = false;
   if (!position.outcomes) {
 
     new_generate_moves(position);
-  }
-  else if (depth == 0) {
-     h = true;
   }
 
   if (position.outcomes->size() == 0) {
@@ -1870,9 +1877,9 @@ void minimax(Position& position, int depth, double alpha, double beta,
   if (position.outcomes->size() <= 3) {
     depth++;
   }
-  if (depth == 0 && (*position.outcomes)[0]->outcomes) {
-       depth = 1;
-  }
+  //if (depth == 0 && (*position.outcomes)[0]->outcomes) {
+  //     depth = 1;
+  //}
   
 
   if (depth >= (min_depth - 1)) {
@@ -1887,18 +1894,35 @@ void minimax(Position& position, int depth, double alpha, double beta,
   std::sort(position.outcomes->begin(), position.outcomes->end(),
             position.white_to_move ? GreaterOutcome : LessOutcome);
   if (depth == 0 &&
-      position.outcomes->back()->evaluation == initial_evaluation) {
+      !position.outcomes->back()->was_capture) {
      //initial_evaluation = position.evaluation;
      if (position.white_to_move) {
        if (position.evaluation > alpha) {
          alpha = position.evaluation;
        }
+       /*for (int i = 0; i < alpha_beta.size(); i++) {
+         if (position.evaluation > alpha_beta[i].second[0]) {
+          alpha_beta[i].second[0] = position.evaluation;
+         }
+       }*/
      } else {
        if (position.evaluation < beta) {
          beta = position.evaluation;
        }
+       //for (int i = 0; i < alpha_beta.size(); i++) {
+       //  if (position.evaluation < alpha_beta[i].second[1]) {
+       //   alpha_beta[i].second[1] = position.evaluation;
+       //  }
+       //}
      }
      if (beta <= alpha) {
+       //for (int i = alpha_beta.size() -2; i >= 0; i--) {
+       //  if (alpha_beta[i].second[0] < alpha_beta[i].second[1]) {
+       //   alpha_beta[i].first->depth = -1;
+       //   alpha_beta.erase(alpha_beta.begin() + i);
+       //  }  
+       //}
+       position.depth = -1;
        return;
      }
 
@@ -1928,20 +1952,22 @@ void minimax(Position& position, int depth, double alpha, double beta,
   //  std::sort(position.outcomes->begin(), position.outcomes->end(),
   //            position.white_to_move ? GreaterOutcome : LessOutcome);
   //}
+  position.depth = depth;
   for (size_t c = 0; c < position.outcomes->size(); c++) {
 
      if (depth == 0) {
-       if ((*position.outcomes)[c]->evaluation == initial_evaluation) {
+       if (!(*position.outcomes)[c]->was_capture &&
+           !(*position.outcomes)[c]->outcomes) {
          continue;
 
        } else {
          //assert(round(initial_evaluation) !=
          //       round((*position.outcomes)[c]->evaluation));
          minimax(*(*position.outcomes)[c], depth, alpha, beta, stop/*,
-                 reasonable_extension *//*, initial_material*/);
+                 reasonable_extension *//*, initial_material*//*, alpha_beta*/);
        }
      } else {
-       minimax(*(*position.outcomes)[c], depth - 1, alpha, beta, stop);
+       minimax(*(*position.outcomes)[c], depth - 1, alpha, beta, stop/*, alpha_beta*/);
      }
     
      if (position.white_to_move) {
@@ -1956,6 +1982,11 @@ void minimax(Position& position, int depth, double alpha, double beta,
        if ((*position.outcomes)[c]->evaluation > alpha) {
          alpha = (*position.outcomes)[c]->evaluation;
        }
+       /*for (int i = 0; i < alpha_beta.size(); i++) {
+         if (position.evaluation > alpha_beta[i].second[0]) {
+          alpha_beta[i].second[0] = position.evaluation;
+         }
+       }*/
      } else {
        if ((*position.outcomes)[c]->evaluation < position.evaluation) {
          position.evaluation = (*position.outcomes)[c]->evaluation;
@@ -1963,18 +1994,183 @@ void minimax(Position& position, int depth, double alpha, double beta,
        if ((*position.outcomes)[c]->evaluation < beta) {
          beta = (*position.outcomes)[c]->evaluation;
        }
+       /*for (int i = 0; i < alpha_beta.size(); i++) {
+         if (position.evaluation < alpha_beta[i].second[1]) {
+          alpha_beta[i].second[1] = position.evaluation;
+         }
+       }*/
      }
      if (beta <= alpha) {
+       /*for (int i = alpha_beta.size() - 2; i >= 0; i--) {
+         if (alpha_beta[i].second[0] < alpha_beta[i].second[1]) {
+          alpha_beta[i].first->depth = -1;
+          alpha_beta.erase(alpha_beta.begin() + i);
+         }
+       }*/
        position.depth = -1;
        return;
      }
   }
-  if (!*stop) {
-      position.depth = depth;
-  } else {
-      position.depth = -1;
+  if (position.evaluation <= initial_alpha ||
+      position.evaluation >= initial_beta || *stop) {
+     position.depth = -1;
   }
+
 }
+//void test_minimax(Position& position, int depth, double alpha, double beta,
+//             bool* stop /*, bool reasonable_extension*/
+//             /*, bool selective_deepening*/ /*, int initial_material*/) {
+//  if (*stop) {
+//      return;
+//  }
+//  if (position.fifty_move_rule >= 6) {
+//      int occurrences = 1;
+//      Position* previous_move = &position;
+//      for (size_t i = 0; i < position.fifty_move_rule; i += 2) {
+//       previous_move = previous_move->previous_move->previous_move;
+//       if (previous_move->board == position.board &&
+//           previous_move->castling == position.castling &&
+//           previous_move->en_passant_target == position.en_passant_target) {
+//         occurrences++;
+//         if (occurrences == 3) {
+//          position.evaluation = 0.0;
+//          position.depth = 1000;
+//          return;
+//         }
+//       }
+//      }
+//  }
+//  double initial_evaluation = position.evaluation;
+//  if (!position.outcomes) {
+//      new_generate_moves(position);
+//  }
+//
+//  if (position.outcomes->size() == 0) {
+//      position.depth = 1000;
+//      if (InCheck(position,
+//                  position.white_to_move ? Color::White : Color::Black)) {
+//       position.evaluation =
+//           position.white_to_move
+//               ? (double)-mate + (double)position.number
+//               : (double)mate - (double)position.number;  // checkmate
+//      } else {
+//       position.evaluation = 0;  // draw by stalemate
+//      }
+//      return;
+//  }
+//  if (position.fifty_move_rule >= 100) {  // fifty move rule
+//      position.evaluation = 0;
+//      position.depth = 1000;
+//      return;
+//  }
+//  if (position.outcomes->size() <= 3) {
+//      depth++;
+//  }
+//  //if (depth == 0 && (*position.outcomes)[0]->outcomes &&
+//  //   (*(*position.outcomes)[0]->outcomes)[0]->outcomes) {
+//  //    depth = 1;
+//  //}
+//
+//  if (depth >= (min_depth - 1)) {
+//      PROCESS_MEMORY_COUNTERS_EX pmc{};
+//      GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc,
+//                           sizeof(pmc));
+//      if (deleting == 0 && pmc.WorkingSetSize > max_bytes) {
+//       *stop = true;
+//      }
+//  }
+//
+//  std::sort(position.outcomes->begin(), position.outcomes->end(),
+//            position.white_to_move ? GreaterOutcome : LessOutcome);
+//  if (depth == 0 &&
+//      position.outcomes->back()->evaluation == initial_evaluation) {
+//      // initial_evaluation = position.evaluation;
+//      if (position.white_to_move) {
+//       if (position.evaluation > alpha) {
+//         alpha = position.evaluation;
+//       }
+//      } else {
+//       if (position.evaluation < beta) {
+//         beta = position.evaluation;
+//       }
+//      }
+//      if (beta <= alpha) {
+//       position.depth = -1;
+//       return;
+//      }
+//
+//  } else {
+//      position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
+//  }
+//  // if (depth == 0) {
+//  //   for (size_t i = 0; i < position.outcomes->size(); i++) {
+//  //      if ((*position.outcomes)[i]->evaluation != initial_evaluation &&
+//  //      !(*position.outcomes)[i]->outcomes) {
+//  //        new_generate_moves(*(*position.outcomes)[i]);
+//  //        if ((*position.outcomes)[i]->outcomes->size() > 0) {
+//  //         (*position.outcomes)[i]->evaluation =
+//  //             (*std::max_element(
+//  //                  (*position.outcomes)[i]->outcomes->begin(),
+//  //                  (*position.outcomes)[i]->outcomes->end(),
+//  //                  ((*position.outcomes)[i]->white_to_move ? GreaterOutcome
+//  //                                                          : LessOutcome)))
+//  //                 ->evaluation;
+//
+//  //        if ((*position.outcomes)[i]->evaluation == initial_evaluation) {
+//  //          (*position.outcomes)[i]->evaluation += 0.0000000001;
+//  //        }
+//  //       }
+//  //     }
+//
+//  //   }
+//  //  std::sort(position.outcomes->begin(), position.outcomes->end(),
+//  //            position.white_to_move ? GreaterOutcome : LessOutcome);
+//  //}
+//  for (size_t c = 0; c < position.outcomes->size(); c++) {
+//      if (depth == 0) {
+//       if (!(*position.outcomes)[c]->was_capture &&
+//           !(*position.outcomes)[c]->outcomes) {
+//         continue;
+//
+//       } else {
+//         // assert(round(initial_evaluation) !=
+//         //        round((*position.outcomes)[c]->evaluation));
+//         test_minimax(*(*position.outcomes)[c], depth, alpha, beta, stop /*,
+//                  reasonable_extension */
+//                 /*, initial_material*/);
+//       }
+//      } else {
+//       test_minimax(*(*position.outcomes)[c], depth - 1, alpha, beta, stop);
+//      }
+//
+//      if (position.white_to_move) {
+//       if ((*position.outcomes)[c]->evaluation > position.evaluation) {
+//         position.evaluation = (*position.outcomes)[c]->evaluation;
+//         // position.best_move = (*position.outcomes)[c];
+//         /*output.castling = position_value.castling;*/
+//       }
+//       if ((*position.outcomes)[c]->evaluation > alpha) {
+//         alpha = (*position.outcomes)[c]->evaluation;
+//       }
+//      } else {
+//       if ((*position.outcomes)[c]->evaluation < position.evaluation) {
+//         position.evaluation = (*position.outcomes)[c]->evaluation;
+//       }
+//       if ((*position.outcomes)[c]->evaluation < beta) {
+//         beta = (*position.outcomes)[c]->evaluation;
+//       }
+//      }
+//      if (beta <= alpha) {
+//       position.depth = -1;
+//       return;
+//      }
+//  }
+//  if (!*stop) {
+//      position.depth = depth;
+//  } else {
+//      position.depth = -1;
+//  }
+//}
 
 int thread_count = 0;
 
@@ -2100,24 +2296,28 @@ void SearchPosition(Position* position, int minimum_depth, bool* stop) {
   }
   while (depth <= minimum_depth && !*stop && CheckGameOver(position) == 2) {
     if (depth > 2) {
-      alpha = position->evaluation - aspiration_window;
-      beta = position->evaluation + aspiration_window;
+      alpha = position->evaluation - alpha_aspiration_window;
+      beta = position->evaluation + beta_aspiration_window;
     } else {
       alpha = std::numeric_limits<double>::lowest();
       beta = INT_MAX;
     }
     minimax(*position, depth, alpha, beta,
-            stop);
+            stop/*, AlphaBeta()*/);
     if (position->evaluation <= alpha) {
       alpha_aspiration_window *= 4; // unexpected advantage for black
     } else if (position->evaluation >= beta) {
       beta_aspiration_window *= 4; // unexpected advantage for white
     } else {
+      assert(position->depth != -1 || *stop);
+      Position* bm = GetBestMove(position);
       alpha_aspiration_window = beta_aspiration_window = aspiration_window;
       approximate_evaluation = position->evaluation;
+      position->depth = depth;
       depth++;
     }
   }
+  assert(*stop || GetBestMove(position)->depth != -1);
 }
 
 
@@ -2135,29 +2335,30 @@ void calculate_moves(void* varg) {
     if (!*input->stop) {
 
       if ((input->position->white_to_move ? 'W' : 'B') == input->side) {
-         double alpha, beta;
-         double alpha_aspiration_window = aspiration_window;
-         double beta_aspiration_window = aspiration_window;
-         double approximate_evaluation = input->position->evaluation;
-        while (input->position->depth < min_depth && !*input->stop) {
-          if (input->position->depth > 2) {
-            alpha = input->position->evaluation - aspiration_window;
-            beta = input->position->evaluation + aspiration_window;
-          } else {
-            alpha = std::numeric_limits<double>::lowest();
-            beta = DBL_MAX;
-          }
-          minimax(*input->position, input->position->depth + 1, alpha, beta, input->stop);
-          if (input->position->evaluation <= alpha) {
-            alpha_aspiration_window *= 4; // unexpected advantage for black
-          } else if (input->position->evaluation >= beta) {
-            beta_aspiration_window *= 4; // unexpected advantage for white
-          } else {
-            alpha_aspiration_window = beta_aspiration_window =
-                aspiration_window;
-            approximate_evaluation = input->position->evaluation;
-          }
-        }
+         SearchPosition(input->position, min_depth, input->stop);
+        // double alpha, beta;
+        // double alpha_aspiration_window = aspiration_window;
+        // double beta_aspiration_window = aspiration_window;
+        // double approximate_evaluation = input->position->evaluation;
+        //while (input->position->depth < min_depth && !*input->stop) {
+        //  if (input->position->depth > 2) {
+        //    alpha = input->position->evaluation - aspiration_window;
+        //    beta = input->position->evaluation + aspiration_window;
+        //  } else {
+        //    alpha = std::numeric_limits<double>::lowest();
+        //    beta = DBL_MAX;
+        //  }
+        //  minimax(*input->position, input->position->depth + 1, alpha, beta, input->stop);
+        //  if (input->position->evaluation <= alpha) {
+        //    alpha_aspiration_window *= 4; // unexpected advantage for black
+        //  } else if (input->position->evaluation >= beta) {
+        //    beta_aspiration_window *= 4; // unexpected advantage for white
+        //  } else {
+        //    alpha_aspiration_window = beta_aspiration_window =
+        //        aspiration_window;
+        //    approximate_evaluation = input->position->evaluation;
+        //  }
+        //}
 
         done = true;
         *input->stop = true;
@@ -2761,7 +2962,7 @@ void LogGameEnd(const Position& position, const int &game_status) {
   }
 }
 
-const int max_positions = 3000000;
+const int max_positions = 3500000;
 
 void UpdateMinDepth(Position& position) {
   if (!position.outcomes) {
@@ -2781,7 +2982,6 @@ void UpdateMinDepth(Position& position) {
 
 int main() {
   thread_count++;
-
   //int max_threads = 6; // 12
 
   //VBoard v_board = {{"BR", "BN", "BB", "BQ", "BK", "BB", "BN", "BR"},
@@ -2830,6 +3030,9 @@ int main() {
   //                 outcomes /*, previous_move*/, nullptr, 0, /*nullptr,*/ kings,
   //                 IntPoint(-1, -1), 0);
   Position* position = Position::StartingPosition();
+  bool* sdt = new bool(false);
+  //test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
+  //test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
   std::cout << std::setprecision(7);
   
   bool mental_chess;
