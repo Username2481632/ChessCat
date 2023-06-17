@@ -1,0 +1,9 @@
+[Event "?"]
+[Site "?"]
+[Date "2023.06.16"]
+[Round "?"]
+[White "Michael Moshchuk + Olga Moshchuk"]
+[Black "ChessCat"]
+[Result "1-0"]
+
+1. e4 d5 2. exd5 Qxd5 3. Nc3 Qc5 4. Ne4 Qd4 5. f3 Bd7 6. Ne2 Qd5 7. N2c3 Qh5 8. Ng3 Qe5+ 9. Be2 Nc6 10. O-O Be6 11. b3 Qd4+ 12. Rf2 Qd8 13. Ba3 Nd4 14. Bc5 a6 15. a4 Nf6 16. b4 b6 17. Bxd4 Qxd4 18. b5 Bd7 19. bxa6 Qh4 20. Nb5 Nd5 21. c4 c6 22. cxd5 cxb5 23. axb5 Qd4 24. Qc1 Rc8 25. Qe1 Qxd5 26. Rc1 Rxc1 27. Qxc1 e6 28. Bc4 Qa8 29. Re2 Kd8 30. Qc3 Ke8 31. Re4 Rg8 32. Qd3 Bc5+ 33. Kf1 Qb8 34. Nf5 Qxh2 35. a7 Qg1+ 36. Ke2 Qa1 37. Nd6+ Bxd6 38. Qxd6 Qxa7 39. Re3 Bc8 40. Bd3 Bd7 41. Bxh7 Bxb5+ 42. Kf2 g5 43. Bxg8 Qd7 44. Qxd7+ Bxd7 45. Rb3 b5 46. Bh7 f5 47. g4 Ke7 48. gxf5 exf5 49. Ke3 Kf7 50. Rd3 Be6 51. Rd6 Bc8 52. Rd5 Kf6 53. Rxb5 Be6 54. Rb6 Kf7 55. Kd4 f4 56. Bg6+ Ke7 57. Ke5 Bg8 58. Rb7+ Kf8 59. Kf6 Bd5 60. Rb8+ 1-0

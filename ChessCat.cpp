@@ -67,7 +67,7 @@ bool InCheck(Position& position, const Color& side, int ki = -1) {
             position.kings[side][0] = i;
             position.kings[side][1] = j;
             i = 8;
-            break;
+            break;  
           }
         }
       }
@@ -135,13 +135,15 @@ bool InCheck(Position& position, const Color& side, int ki = -1) {
         continue;
       }
       while (true) {
-        if (position.board[(size_t)new_i].color == side) {
+        if (position.board[(size_t)new_i].color == side &&
+            position.board[(size_t)new_i].type != 'K') {
         break;
         } else if (position.board[(size_t)new_i].color == opponent) {
           if (position.board[(size_t)new_i].type == 'B' ||
               position.board[(size_t)new_i].type == 'Q') {
           return true;
           }
+          break;
         }
         if (new_i <= 8 || new_i >= 55 || (new_i & 7) == 7 || (new_i & 7) == 0) {
           break;
@@ -158,13 +160,15 @@ bool InCheck(Position& position, const Color& side, int ki = -1) {
         continue;
       }
       while (true) {
-        if (position.board[(size_t)new_i].color == side) {
+        if (position.board[(size_t)new_i].color == side &&
+            position.board[(size_t)new_i].type != 'K') {
           break;
         } else if (position.board[(size_t)new_i].color == opponent) {
           if (position.board[(size_t)new_i].type == 'R' ||
               position.board[(size_t)new_i].type == 'Q') {
           return true;
           }
+          break;
         }
         if (k == 0) {
           if (new_i <= 7) {
@@ -184,6 +188,14 @@ bool InCheck(Position& position, const Color& side, int ki = -1) {
           }
         }
         new_i += rook_moves[k];
+      }
+    }
+    // king check
+    for (size_t k = 0; k < 8; k++) {
+      new_i = (int)i + king_moves[k];
+      if (new_i >= 0 && new_i <= 63 && (((int)i & 7) - (new_i & 7)) <= 1 &&
+          ((int)i & 7) - (new_i & 7) >= -1 && position.board[new_i].type == 'K') {
+        return true;
       }
     }
     return false;
@@ -816,13 +828,13 @@ size_t CountPieceMoves(Position& position, size_t& i, const Check& check_info) {
 
 
 size_t CountMoves(Position& position) {
-  Check white_check;
-  Check black_check;
-  GetCheckInfo(white_check, position);
-  GetCheckInfo(black_check, position);
+  //Check white_check;
+  //Check black_check;
+  //GetCheckInfo(white_check, position);
+  //GetCheckInfo(black_check, position);
   int new_i;
   size_t moves = 0;
-  Check& check_info = white_check;
+  //Check& check_info = white_check;
   for (size_t i = 0; i <= 63; i++) {
       if (position.board[i].color == Color::Empty) {
         continue;
@@ -837,14 +849,14 @@ size_t CountMoves(Position& position) {
         }
         continue;
       }
-      if (position.board[i].color == Color::White) {
-        check_info = white_check;
-      } else {
-        check_info = black_check;
-      }
+      //if (position.board[i].color == Color::White) {
+      //  check_info = white_check;
+      //} else {
+      //  check_info = black_check;
+      //}
       // counting moves
       // int addition = position.board[i][j].color == 'W' ? 1 : -1;
-      moves += CountPieceMoves(position, i, check_info);
+      moves += CountPieceMoves(position, i, Check());
     }
   
 
@@ -2321,7 +2333,21 @@ void SearchPosition(Position* position, int minimum_depth, bool* stop) {
   }
  // assert(*stop || GetBestMove(position)->depth != -1);
 }
+int FindMinDepth(Position& position) {
+  if (!position.outcomes) {
+    new_generate_moves(position);
+  }
+  double branching_factor = (double)CountMoves(position) / 2.0;
+  double material = round(position.evaluation);
+  for (size_t i = 0; i < position.outcomes->size(); i++) {
+    if (EvaluateMaterial(*(*position.outcomes)[i]) != material) {
+      branching_factor++;
+    }
+  }
 
+  return (int)std::max(4.0,
+                       round(log2(max_positions) / (log2(branching_factor))));
+}
 
 
 void calculate_moves(void* varg) {
@@ -2370,11 +2396,15 @@ void calculate_moves(void* varg) {
         while (!*input->stop && std::any_of(input->position->outcomes->begin(), input->position->outcomes->end(), [](Position* position){
           return (position->evaluation < (double)mate / 2.0) &&(position->evaluation > (double)-mate / 2.0);
                             })) {
+          std::sort(input->position->outcomes->begin(), input->position->outcomes->end(),
+                    input->position->white_to_move ? GreaterOutcome : LessOutcome);
           for (size_t i = 0;
                i < input->position->outcomes->size() && !*input->stop; i++) {
             SearchPosition(
                 (*input->position->outcomes)[i],
-                std::max(min_depth, (*input->position->outcomes)[i]->depth + 1), input->stop);  // do position->depth + 1 while
+                std::max(FindMinDepth(*(*input->position->outcomes)[i]),
+                                    (*input->position->outcomes)[i]->depth + 1),
+                           input->stop);  // do position->depth + 1 while
                                                  // position->depth < min_depth
           }
         }
@@ -2966,23 +2996,24 @@ void LogGameEnd(const Position& position, const int &game_status) {
   }
 }
 
-const int max_positions = 10000000;
 
-void UpdateMinDepth(Position& position) {
-  if (!position.outcomes) {
-    new_generate_moves(position);
-  }
-  double branching_factor = (double)CountMoves(position) / 2.0;
-  double material = round(position.evaluation);
-  for (size_t i = 0; i < position.outcomes->size(); i++) {
-    if (EvaluateMaterial(*(*position.outcomes)[i]) != material) {
-      branching_factor++;
-    }
-  }
+//void UpdateMinDepth(Position& position) {
+//  if (!position.outcomes) {
+//    new_generate_moves(position);
+//  }
+//  double branching_factor = (double)CountMoves(position) / 2.0;
+//  double material = round(position.evaluation);
+//  for (size_t i = 0; i < position.outcomes->size(); i++) {
+//    if (EvaluateMaterial(*(*position.outcomes)[i]) != material) {
+//      branching_factor++;
+//    }
+//  }
+//
+//  min_depth = (int)std::max(
+//      4.0, round(log2(max_positions) / (log2(branching_factor))));
+//}
 
-  min_depth = (int)std::max(
-      4.0, round(log2(max_positions) / (log2(branching_factor))));
-}
+
 
 int main() {
   thread_count++;
@@ -3114,7 +3145,7 @@ int main() {
   //new_generate_moves(*position);
   SeekResult result;
   std::cout << MakeString(*position, white_on_bottom) << std::endl;
-  UpdateMinDepth(*position);
+  min_depth = FindMinDepth(*position);
   if (engine_white != position->white_to_move) {
     // minimax(*position, 1, INT_MIN, INT_MAX, info->stop, false); // TODO: delete this line
     new_generate_moves(*position);
@@ -3138,7 +3169,7 @@ int main() {
       }
     }
   }
-  SearchPosition(position, std::max(min_depth - 2, 2), info->stop);
+  SearchPosition(position, 2, info->stop);
   std::cout << "Material evaluation: " << EvaluateMaterial(*position)
             << std::endl;
   std::cout << "Evaluation on depth "
@@ -3282,9 +3313,9 @@ ComplicatedLessOutcome);
       info->trash->emplace_back(position, nullptr);
       position = new_position;
       info->position = position;
+      min_depth = FindMinDepth(*position);
       done = false;
       *info->stop = false;
-
       stop_cv.notify_one();
       continue;
     } else if (game_over) {
@@ -3327,7 +3358,7 @@ ComplicatedLessOutcome);
         new_generate_moves(*new_position);
       }
 
-          UpdateMinDepth(*position);
+      min_depth = FindMinDepth(*position);
       done = false;
       // stop_mutex.lock();
       *info->stop = false;

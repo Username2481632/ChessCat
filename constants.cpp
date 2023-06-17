@@ -6,6 +6,7 @@ const int knight_moves[8] = {-17, -15, -6, 10, 17, 15, 6, -10};
 const int bishop_moves[4] = {-9, -7, 9, 7};
 const int king_moves[8] = {-9, -8, -7, 1, 9, 8, 7, -1};
 const int rook_moves[4] = {-8, 1, 8, -1};
+const int max_positions = 40000000;
 
 const Board starting_board = {
     {Piece(Color::Black, 'R'), Piece(Color::Black, 'N'),
