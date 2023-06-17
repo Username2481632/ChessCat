@@ -1,9 +1,3 @@
-#include "constants.h"
-#include "get_check_info.h"
-#include "position.h"
-#include "types.h"
-#include "utils.h"
-
 #include <Windows.h>
 #include <assert.h>
 #include <process.h>
@@ -16,6 +10,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -28,14 +23,19 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "constants.h"
+#include "get_check_info.h"
+#include "position.h"
+#include "types.h"
+#include "utils.h"
 #undef min
 #undef max
 
 std::binary_semaphore computed{0};
 std::mutex position_mutex;
 
-
- //int g_copied_boards = 0;
+// int g_copied_boards = 0;
  //int boards_created = 0;
  //int boards_destroyed = 0;
 
@@ -3030,7 +3030,6 @@ int main() {
   //                 outcomes /*, previous_move*/, nullptr, 0, /*nullptr,*/ kings,
   //                 IntPoint(-1, -1), 0);
   Position* position = Position::StartingPosition();
-  bool* sdt = new bool(false);
   //test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
   //test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
   std::cout << std::setprecision(7);
@@ -3039,24 +3038,42 @@ int main() {
   std::cout << "Mental chess? ";
   std::cin >> mental_chess;
 
+  bool confirmation = false;
 
-  bool resume;
-  std::cout << "Resume? ";
-  std::cin >> resume;
-  if (resume) {
-    //ReadPosition(*position);
-    position = ReadPGN(position);
-  }
-  else {
-    std::ofstream file;
-    file.open("PGN_position.txt");
-    file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
-  }
-  for (size_t i = 0; i < 64; i++) {
-      if (position->board[i].type == 'K') {
-        position->kings[position->board[i].color] = i;
+  bool resume = false;
+  while (!resume && !confirmation) {
+    std::cout << "Resume? ";
+    std::cin >> resume;
+    if (resume) {
+      // ReadPosition(*position);
+      position = ReadPGN(position);
+      for (size_t i = 0; i < 64; i++) {
+        if (position->board[i].type == 'K') {
+          position->kings[position->board[i].color] = i;
+        }
       }
+    } else {
+      if (std::filesystem::exists("PGN_position.txt")) {
+        std::string response;
+        std::cout
+            << "'PGN_position.txt' already exists. Do you want to replace it? ";
+        std::cin >> response;
+        while (ToLower(response) != "yes" && ToLower(response) != "no") {
+          std::cout << "'PGN_position.txt' already exists.Do you want to "
+                       "replace it (please enter \"yes\" or \"no\")? ";
+          std::cin >> response;
+        }
+        confirmation = response == "yes";
+        if (confirmation) {
+          std::ofstream file;
+          file.open("PGN_position.txt");
+          file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round "
+                  "\"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
+        }
+      }
+    }
   }
+    
   //std::cout << InCheck(*position, position->to_move);
   
   // standard notation: type the coordinates of the starting and end point (such as 6444 for e4). if you type one more point, that point becomes an empty square (for en passant). For castling, type the king move and the rook move right after each other. For promotions, add =[insert piece type] after the pawn move (such as 1404=Q) piece types are Q, B, R, N.
