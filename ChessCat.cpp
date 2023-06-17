@@ -1851,7 +1851,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
     }
   
   }
-  double initial_evaluation = position.evaluation;
+  //double initial_evaluation = position.evaluation;
   if (!position.outcomes) {
 
     new_generate_moves(position);
@@ -2295,8 +2295,8 @@ void SearchPosition(Position* position, int minimum_depth, bool* stop) {
     new_generate_moves(*position);
   }
   while (depth <= minimum_depth && !*stop && CheckGameOver(position) == 2 &&
-         (position->white_to_move ? (position->evaluation < ((double)mate / 2.0)) :
-         position->evaluation > (double)-mate / 2.0)) {
+         (position->evaluation < ((double)mate / 2.0)) &&
+         (position->evaluation > ((double)-mate / 2.0))) {
     if (depth > 2) {
       alpha = position->evaluation - alpha_aspiration_window;
       beta = position->evaluation + beta_aspiration_window;
@@ -2312,7 +2312,7 @@ void SearchPosition(Position* position, int minimum_depth, bool* stop) {
       beta_aspiration_window *= 4; // unexpected advantage for white
     } else {
       assert(position->depth != -1 || *stop);
-      Position* bm = GetBestMove(position);
+      //Position* bm = GetBestMove(position);
       alpha_aspiration_window = beta_aspiration_window = aspiration_window;
       approximate_evaluation = position->evaluation;
       position->depth = depth;
@@ -2368,8 +2368,7 @@ void calculate_moves(void* varg) {
 
       } else {
         while (!*input->stop && std::any_of(input->position->outcomes->begin(), input->position->outcomes->end(), [](Position* position){
-          return (position->white_to_move ? (position->evaluation < (double)mate / 2.0) :
-        ( position->evaluation > (double)-mate / 2.0));
+          return (position->evaluation < (double)mate / 2.0) &&(position->evaluation > (double)-mate / 2.0);
                             })) {
           for (size_t i = 0;
                i < input->position->outcomes->size() && !*input->stop; i++) {
@@ -2732,7 +2731,7 @@ std::stringstream elements_line(FEN);
   } else {
     position.en_passant_target = -1;
   }
-  position.fifty_move_rule = (size_t)stoi(elements[4]);
+  position.fifty_move_rule = (unsigned char)stoi(elements[4]);
 }
 
 
@@ -2967,7 +2966,7 @@ void LogGameEnd(const Position& position, const int &game_status) {
   }
 }
 
-const int max_positions = 3500000;
+const int max_positions = 10000000;
 
 void UpdateMinDepth(Position& position) {
   if (!position.outcomes) {
@@ -3069,19 +3068,25 @@ int main() {
           std::cin >> response;
         }
         confirmation = response == "yes";
-        if (confirmation) {
-          std::ofstream file;
-          file.open("PGN_position.txt");
-          file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round "
-                  "\"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
-        }
+      } else {
+        confirmation = true;
+      }
+      if (confirmation) {
+        std::ofstream file;
+        file.open("PGN_position.txt");
+        file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round "
+                "\"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
       }
     }
   }
-    
-  //std::cout << InCheck(*position, position->to_move);
-  
-  // standard notation: type the coordinates of the starting and end point (such as 6444 for e4). if you type one more point, that point becomes an empty square (for en passant). For castling, type the king move and the rook move right after each other. For promotions, add =[insert piece type] after the pawn move (such as 1404=Q) piece types are Q, B, R, N.
+
+  // std::cout << InCheck(*position, position->to_move);
+
+  // standard notation: type the coordinates of the starting and end point (such
+  // as 6444 for e4). if you type one more point, that point becomes an empty
+  // square (for en passant). For castling, type the king move and the rook move
+  // right after each other. For promotions, add =[insert piece type] after the
+  // pawn move (such as 1404=Q) piece types are Q, B, R, N.
 
   char color;
   bool game_over = false;
@@ -3109,10 +3114,8 @@ int main() {
   //new_generate_moves(*position);
   SeekResult result;
   std::cout << MakeString(*position, white_on_bottom) << std::endl;
-  if (engine_white == position->white_to_move) {
-    //std::cout << "My move: ";
-    UpdateMinDepth(*position);
-  } else {
+  UpdateMinDepth(*position);
+  if (engine_white != position->white_to_move) {
     // minimax(*position, 1, INT_MIN, INT_MAX, info->stop, false); // TODO: delete this line
     new_generate_moves(*position);
     game_status = CheckGameOver(position);
@@ -3135,6 +3138,15 @@ int main() {
       }
     }
   }
+  SearchPosition(position, std::max(min_depth - 2, 2), info->stop);
+  std::cout << "Material evaluation: " << EvaluateMaterial(*position)
+            << std::endl;
+  std::cout << "Evaluation on depth "
+            << ((position->depth <= 0) ? "?" : std::to_string(position->depth))
+            << ": " << Convert(position->evaluation) << std::endl;
+  std::cout << "Moves: " << position->outcomes->size() << std::endl
+            << "Material: " << (float)CountMaterial(*position) / 2.0
+            << std::endl;
   t_c_mutex.lock();
   thread_count++;
   if (thread_count >= max_threads) {

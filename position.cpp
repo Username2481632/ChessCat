@@ -5,7 +5,7 @@
 Position::Position(bool wtm, int n, double e, Board b,
                    Castling c /*, time_t t*/, std::vector<Position*>* o,
                    Position* pm, int d,
-                   /*Position* bm,*/ Kings k, int ept, size_t fmc, bool wc)
+                   /*Position* bm,*/ Kings k, int ept, unsigned char fmc, bool wc)
     : white_to_move(wtm),
       number(n),
       evaluation(e),
@@ -26,7 +26,7 @@ Position::Position(bool wtm, int n, double e, Board b,
 Position* Position::StartingPosition() {
     return new Position(true, 0, 0.0, starting_board,
                         Castling(true, true, true, true), nullptr, nullptr, -1,
-                        Kings(60, 4), -1, 0, false);
+                        Kings(60, 4), -1, 0U, false);
 }
 
 Position Position::GenerateMovesCopy() {
@@ -34,7 +34,7 @@ Position Position::GenerateMovesCopy() {
                     castling, nullptr /* outcomes */, this /* previous_move */,
                     -1 /*depth*/, /*
 nullptr /* best_move */
-                    /*, */ kings, -1, fifty_move_rule + 1, false);
+                    /*, */ kings, -1, fifty_move_rule + 1U, false);
 }
 
 Position::~Position() {

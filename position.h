@@ -15,12 +15,12 @@ struct Position {
   Position* previous_move;
   Kings kings;
   int en_passant_target;
-  size_t fifty_move_rule;
+  unsigned char fifty_move_rule;
   bool was_capture;
 
   Position(bool wtm, int n, double e, Board b, Castling c /*, time_t t*/,
            std::vector<Position*>* o, Position* pm, int d,
-           /*Position* bm,*/ Kings k, int ept, size_t fmc, bool wc);
+           /*Position* bm,*/ Kings k, int ept, unsigned char fmc, bool wc);
   ~Position();
 
   static Position* StartingPosition();
