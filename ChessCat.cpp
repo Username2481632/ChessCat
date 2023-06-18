@@ -3098,18 +3098,19 @@ int main() {
   //test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
   //test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
   std::cout << std::setprecision(7);
-  
-  bool mental_chess;
-  std::cout << "Mental chess? ";
-  std::cin >> mental_chess;
+
 
   bool confirmation = false;
 
-  bool resume = false;
   while (!confirmation) {
+    std::string response;
     std::cout << "Resume? ";
-    std::cin >> resume;
-    if (resume) {
+    std::getline(std::cin, response);
+    while (response != "1" && response != "0") {
+      std::cout << "Resume (please enter 1 or 0)? ";
+      std::getline(std::cin, response);
+    }
+    if (response == "1") {
       if (!std::filesystem::exists("PGN_position.txt")) {
         std::string response;
         std::cout << "'PGN_position.txt' does not exist. Start new game? ";
@@ -3292,7 +3293,6 @@ ComplicatedLessOutcome);
                   << std::endl;  // sometimes dies with this line being "the
                                  // next statement to execute when this thread
                                  // returns from the current function"
-        if (!mental_chess) { // died with this
           std::cout << MakeString(*best_move, white_on_bottom) << std::endl;
           std::cout << "Material evaluation: " << EvaluateMaterial(*best_move) << std::endl;
           std::cout << "Evaluation on depth "
@@ -3316,7 +3316,7 @@ ComplicatedLessOutcome);
           std::cout/* << "[finished line]"*/ << std::endl;
           std::cout << "Moves: " << best_move->outcomes->size() << std::endl
                     << "Material: " << CountMaterial(*best_move) / 2.0 << std::endl;
-        }
+        
         position = best_move;
         if (game_status != 2) {
           game_over = true;
@@ -3349,20 +3349,20 @@ ComplicatedLessOutcome);
                    "from current position (using PGN file).\nFlipBoard         "
                    "  Flip "
                    "the chess board being displayed.\nPositionLocation    Get "
-                   "the path to the PGN_position.txt file.\nChangeSide          Change the side the engine is playing for."
+                   "the path to the PGN_position.txt file.\nChangeSide          Change the side the engine is playing for.\n"
           << std::endl;
       continue;
     } else if (move == "ChangeSide") {
       std::string response;
       std::cout << "What color am I playing? ";
-      std::cin >> response;
+      std::getline(std::cin, response);
       while (response != "W" && response != "w" && response != "b" &&
              response != "B") {
         std::cout << "What color am I playing (please enter \"w\" or \"b\")? ";
-        std::cin >> response;
+        getline(std::cin, response);
       }
       engine_white = ((response == "W") || (response == "w"));
-
+      continue;
     } else if (move == "PositionLocation") {
       std::cout
           << "'PGN_position.txt' is located at: "
@@ -3398,11 +3398,9 @@ ComplicatedLessOutcome);
       stop_mutex.unlock();
       waiting.acquire();
 
-      if (!mental_chess) {
             std::cout << MakeString(*new_position, white_on_bottom)
                       << std::endl;
             std::cout << Convert(new_position->evaluation) << std::endl;
-      }
       game_over = false;
       info->trash->emplace_back(position, nullptr);
       position = new_position;
@@ -3434,7 +3432,6 @@ ComplicatedLessOutcome);
 
 
       //printf("[main thread %d] acquire complete.\n", GetCurrentThreadId());
-      if (!mental_chess) {
         std::cout << MakeString(*new_position, white_on_bottom) << std::endl;
         std::cout << "Material evaluation: " << EvaluateMaterial(*new_position) << std::endl;
         std::cout << "Evaluation on depth " << ((new_position->depth <= 0)
@@ -3443,7 +3440,6 @@ ComplicatedLessOutcome);
         std::cout << "Moves: " << new_position->outcomes->size() << std::endl
                   << "Material: " << (float)CountMaterial(*new_position) / 2.0
                   << std::endl;
-      }
 
       info->trash->emplace_back(position, new_position);
       position = new_position;
