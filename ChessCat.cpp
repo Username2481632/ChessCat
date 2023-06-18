@@ -3111,8 +3111,14 @@ int main() {
     std::cin >> resume;
     if (resume) {
       if (!std::filesystem::exists("PGN_position.txt")) {
+        std::string response;
         std::cout << "'PGN_position.txt' does not exist. Start new game? ";
-        std::cin >> confirmation;
+        std::cin >> response;
+        while (ToLower(response) != "yes" && ToLower(response) != "no") {
+          std::cout << "'PGN_position.txt' does not exist. Start new game (please enter \"yes\" or \"no\")? ";
+          std::cin >> response;
+        }
+        confirmation = ToLower(response) == "yes";
       } else {
         // ReadPosition(*position);
         position = ReadPGN(position);
@@ -3334,7 +3340,34 @@ ComplicatedLessOutcome);
 
      //lower_move = ToLower(move);
     if (ToLower(move) == "help") {
-      std::cout << "Disable         Turn the engine off.\nEnable          Turn the engine on.\n+N              Seek N moves forward from current position (using PGN file).\n-N              Seek N moves back from current position (using PGN file).\nFlipBoard       Flip the chess board being displayed.\n" << std::endl;
+      std::cout << "Disable             Turn the engine off.\nEnable           "
+                   "   Turn the "
+                   "engine on.\n+N                  Seek N moves forward from "
+                   "current "
+                   "position (using PGN file).\n-N                  Seek N "
+                   "moves back "
+                   "from current position (using PGN file).\nFlipBoard         "
+                   "  Flip "
+                   "the chess board being displayed.\nPositionLocation    Get "
+                   "the path to the PGN_position.txt file.\nChangeSide          Change the side the engine is playing for."
+          << std::endl;
+      continue;
+    } else if (move == "ChangeSide") {
+      std::string response;
+      std::cout << "What color am I playing? ";
+      std::cin >> response;
+      while (response != "W" && response != "w" && response != "b" &&
+             response != "B") {
+        std::cout << "What color am I playing (please enter \"w\" or \"b\")? ";
+        std::cin >> response;
+      }
+      engine_white = ((response == "W") || (response == "w"));
+
+    } else if (move == "PositionLocation") {
+      std::cout
+          << "'PGN_position.txt' is located at: "
+          << (std::filesystem::current_path() / "PGN_position.txt").string()
+          << std::endl;
       continue;
     } else if (move == "FlipBoard") {
       white_on_bottom = !white_on_bottom;

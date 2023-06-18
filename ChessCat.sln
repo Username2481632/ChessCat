@@ -5,6 +5,8 @@ VisualStudioVersion = 17.5.33502.453
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ChessCat", "ChessCat.vcxproj", "{3A05885F-1233-4AC9-9844-279B826A99C5}"
 EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "ChessCat Installer", "..\ChessCatSetup\ChessCatSetup.vdproj", "{EC2482A9-4A54-4BBA-A7BE-2C9ABCCF1046}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,11 @@ Global
 		{3A05885F-1233-4AC9-9844-279B826A99C5}.Release|x64.Build.0 = Release|x64
 		{3A05885F-1233-4AC9-9844-279B826A99C5}.Release|x86.ActiveCfg = Release|Win32
 		{3A05885F-1233-4AC9-9844-279B826A99C5}.Release|x86.Build.0 = Release|Win32
+		{EC2482A9-4A54-4BBA-A7BE-2C9ABCCF1046}.Debug|x64.ActiveCfg = Debug
+		{EC2482A9-4A54-4BBA-A7BE-2C9ABCCF1046}.Debug|x86.ActiveCfg = Debug
+		{EC2482A9-4A54-4BBA-A7BE-2C9ABCCF1046}.Release|x64.ActiveCfg = Release
+		{EC2482A9-4A54-4BBA-A7BE-2C9ABCCF1046}.Release|x64.Build.0 = Release
+		{EC2482A9-4A54-4BBA-A7BE-2C9ABCCF1046}.Release|x86.ActiveCfg = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
