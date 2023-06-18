@@ -68,10 +68,10 @@ using Board = std::array<Piece, 64>;
 // };
 
 struct Kings {
-  size_t white_king;
-  size_t black_king;
-  size_t& operator[](const Color& color);
-  Kings(size_t wk, size_t bk);
+  unsigned char white_king;
+  unsigned char black_king;
+  unsigned char& operator[](const Color& color);
+  Kings(unsigned char wk, unsigned char bk);
 };
 
 struct Check {

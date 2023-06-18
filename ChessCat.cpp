@@ -194,7 +194,9 @@ bool InCheck(Position& position, const Color& side, int ki = -1) {
     for (size_t k = 0; k < 8; k++) {
       new_i = (int)i + king_moves[k];
       if (new_i >= 0 && new_i <= 63 && (((int)i & 7) - (new_i & 7)) <= 1 &&
-          ((int)i & 7) - (new_i & 7) >= -1 && position.board[new_i].type == 'K') {
+          ((int)i & 7) - (new_i & 7) >= -1 &&
+          position.board[(size_t)new_i].type == 'K' &&
+          position.board[(size_t)new_i].color == opponent) {
         return true;
       }
     }
@@ -883,9 +885,6 @@ const char promotion_pieces[4] = {'Q', 'R', 'B', 'N'};
 
 const std::set<char> pieces = {'K', 'Q', 'R', 'B', 'N'};
 
-const int mate = 20000;
-
-
 
 
 bool board_exists(const Position& position, const Position& new_position) {
@@ -904,10 +903,11 @@ bool board_exists(const Position& position, const Position& new_position) {
 
 
 
-
+//unsigned int nodes = 0;
 
 
 void new_generate_moves(Position& position) {
+  //nodes++;
   Position base_position = position.GenerateMovesCopy();
   // base_position.previous_move = &position;
   Color opponent = position.white_to_move ? Color::Black : Color::White;
@@ -979,7 +979,7 @@ void new_generate_moves(Position& position) {
           bool left_capture =
               ((i & 7) != 0) &&
               position.board[i + multiplier - 1].color == opponent;
-          //assert((i + multiplier + 1) <= 63);
+          assert(((i & 7) == 7) || (i + multiplier + 1) <= 63);
           bool right_capture =
               ((i & 7) != 7) &&
               position.board[i + multiplier + 1].color == opponent;
@@ -1284,7 +1284,7 @@ void new_generate_moves(Position& position) {
             new_position = base_position.CreateDeepCopy();
             new_position->board[(size_t)new_i] = position.board[i];
             new_position->board[i].Empty();
-            new_position->kings[position.board[i].color] = (size_t)new_i;
+            new_position->kings[position.board[i].color] = (unsigned char)new_i;
             // if (!InCheck(*new_position, position.to_move)) {
             if (position.white_to_move) {
               new_position->castling.white_o_o =
@@ -1316,7 +1316,7 @@ void new_generate_moves(Position& position) {
           new_position = base_position.CreateDeepCopy();
           new_position->board[i + 2].set(position.board[i].color, 'K');
           new_position->board[i + 1].set(position.board[i].color, 'R');
-          new_position->kings[position.board[i].color] = i + 2;
+          new_position->kings[position.board[i].color] = (unsigned char)i + 2U;
           new_position->board[i].Empty();
           new_position->board[i + 3].Empty();
           if (position.white_to_move) {
@@ -1341,7 +1341,7 @@ void new_generate_moves(Position& position) {
           new_position->board[i - 1].set(position.board[i].color, 'R');
           new_position->board[i - 4].Empty();
           new_position->board[i].Empty();
-          new_position->kings[position.white_to_move ? Color::White : Color::Black] = i - 2;
+          new_position->kings[position.white_to_move ? Color::White : Color::Black] = (unsigned char)i - 2U;
           if (position.white_to_move) {
             new_position->castling.white_o_o =
                 new_position->castling.white_o_o_o = false;
@@ -1371,7 +1371,7 @@ void new_generate_moves(Position& position) {
       }
     }
   }
-
+  //nodes += position.outcomes->size();
 }
 
 Position* FindPosition(const Board& board, const Position& position) {
@@ -1831,11 +1831,16 @@ int min_depth = 4;  // no less than 2
 //
 // uint64_t safe_bytes = (1 << 30) * (uint64_t)8;
 //const uint64_t minimum_bytes = (1 << 30) * (uint64_t)4;
-const uint64_t max_bytes = (1 << 30) * (uint64_t)16;
+uint64_t max_bytes = (1 << 30) * (uint64_t)16;
+uint64_t min_free = (2U << 30);
 //const int deepening_depth = 2;
 
 //int reasonability_limit = 8;
 //using AlphaBeta = std::vector<std::pair<Position*, std::array<int, 2>>>;
+
+bool IsQuiet(Position* position) {
+  return !position->was_capture && !position->outcomes;
+}
 
 void minimax(Position& position, int depth, double alpha, double beta,
              bool* stop/*, bool reasonable_extension*//*, bool selective_deepening*//*, int initial_material*//*, AlphaBeta alpha_beta*/) {
@@ -1848,7 +1853,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
   if (position.fifty_move_rule >= 6) {
      int occurrences = 1;
      Position* previous_move = &position;
-     for (size_t i = 0; i < position.fifty_move_rule; i += 2) {
+     for (size_t i = 1; i < position.fifty_move_rule; i += 2) {
        previous_move = previous_move->previous_move->previous_move;
        if (previous_move->board == position.board &&
            previous_move->castling == position.castling &&
@@ -1895,10 +1900,12 @@ void minimax(Position& position, int depth, double alpha, double beta,
   
 
   if (depth >= (min_depth - 1)) {
-     PROCESS_MEMORY_COUNTERS_EX pmc{};
-     GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc,
-                          sizeof(pmc));
-     if (deleting == 0 && pmc.WorkingSetSize > max_bytes) {
+
+     MEMORYSTATUSEX statex{};
+    statex.dwLength = sizeof(statex);
+
+    GlobalMemoryStatusEx(&statex);
+     if (deleting == 0 && statex.ullAvailPhys < min_free) {
        *stop = true;
      }
   }
@@ -1906,7 +1913,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
   std::sort(position.outcomes->begin(), position.outcomes->end(),
             position.white_to_move ? GreaterOutcome : LessOutcome);
   if (depth == 0 &&
-      !position.outcomes->back()->was_capture) {
+      std::any_of(position.outcomes->begin(), position.outcomes->end(), IsQuiet)) {
      //initial_evaluation = position.evaluation;
      if (position.white_to_move) {
        if (position.evaluation > alpha) {
@@ -1939,7 +1946,7 @@ void minimax(Position& position, int depth, double alpha, double beta,
      }
 
   } else {
-     position.evaluation = position.white_to_move ? INT_MIN : INT_MAX;
+     position.evaluation = position.white_to_move ? std::numeric_limits<double>::lowest() : INT_MAX;
   }
   //if (depth == 0) {
   //  for (size_t i = 0; i < position.outcomes->size(); i++) {
@@ -2239,9 +2246,9 @@ struct ThreadInfo {
   Position* position;
   bool* stop;
   TrashType* trash;
-  char side;
-  ThreadInfo(Position* p, bool* s, TrashType* t, char c)
-      : position(p), stop(s), trash(t), side(c) {}
+  bool engine_white;
+  ThreadInfo(Position* p, bool* s, TrashType* t, bool ew)
+      : position(p), stop(s), trash(t), engine_white(ew) {}
 };
 bool done = false;
 std::condition_variable done_cv;
@@ -2333,17 +2340,38 @@ void SearchPosition(Position* position, int minimum_depth, bool* stop) {
   }
  // assert(*stop || GetBestMove(position)->depth != -1);
 }
+uint64_t max_positions = (max_bytes << 1) / (3 * sizeof(Position));
+//const uint64_t leeway_bytes = (2U << 30);
+
+const uint64_t min_bytes = (3U << 30);  // 3221225472
+
 int FindMinDepth(Position& position) {
   if (!position.outcomes) {
     new_generate_moves(position);
   }
   double branching_factor = (double)CountMoves(position) / 2.0;
-  double material = round(position.evaluation);
-  for (size_t i = 0; i < position.outcomes->size(); i++) {
-    if (EvaluateMaterial(*(*position.outcomes)[i]) != material) {
+ for (size_t i = 0; i < position.outcomes->size(); i++) {
+    if ((*position.outcomes)[i]->was_capture) {
       branching_factor++;
     }
   }
+  MEMORYSTATUSEX statex{};
+  statex.dwLength = sizeof(statex);
+
+  GlobalMemoryStatusEx(&statex);
+  PROCESS_MEMORY_COUNTERS_EX pmc{};
+  GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc,
+                       sizeof(pmc));
+
+  uint64_t available = statex.ullAvailPhys + pmc.WorkingSetSize;
+  if (available < min_bytes) {
+    std::cout << std::endl << "Not enough RAM available." << std::endl;
+    exit(1);
+  }
+  min_free = (uint64_t)((double)available * 2.0 / branching_factor);
+  max_bytes = available - min_free;
+  max_positions = (max_bytes << 1) / (3 * sizeof(Position));
+  
 
   return (int)std::max(4.0,
                        round(log2(max_positions) / (log2(branching_factor))));
@@ -2362,7 +2390,7 @@ void calculate_moves(void* varg) {
   while (true) {
     if (!*input->stop) {
 
-      if ((input->position->white_to_move ? 'W' : 'B') == input->side) {
+      if (input->position->white_to_move == input->engine_white) {
          SearchPosition(input->position, min_depth, input->stop);
         // double alpha, beta;
         // double alpha_aspiration_window = aspiration_window;
@@ -2418,8 +2446,8 @@ void calculate_moves(void* varg) {
       if (!input->position->outcomes) {
         new_generate_moves(*input->position);
       }
-      if ((input->position->white_to_move ? 'W' : 'B') ==
-              input->side && /*(input->position->depth >= min_depth ||*/
+      if (input->position->white_to_move  ==
+              input->engine_white && /*(input->position->depth >= min_depth ||*/
           input->position->outcomes->size() == 1 /*)*/) {
         input->position->evaluation =
             (*input->position->outcomes)[0]->evaluation;
@@ -3017,6 +3045,7 @@ void LogGameEnd(const Position& position, const int &game_status) {
 
 int main() {
   thread_count++;
+
   //int max_threads = 6; // 12
 
   //VBoard v_board = {{"BR", "BN", "BB", "BQ", "BK", "BB", "BN", "BR"},
@@ -3065,6 +3094,7 @@ int main() {
   //                 outcomes /*, previous_move*/, nullptr, 0, /*nullptr,*/ kings,
   //                 IntPoint(-1, -1), 0);
   Position* position = Position::StartingPosition();
+  //SearchPosition(position, FindMinDepth(*position), new bool(false));
   //test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
   //test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
   std::cout << std::setprecision(7);
@@ -3076,16 +3106,22 @@ int main() {
   bool confirmation = false;
 
   bool resume = false;
-  while (!resume && !confirmation) {
+  while (!confirmation) {
     std::cout << "Resume? ";
     std::cin >> resume;
     if (resume) {
-      // ReadPosition(*position);
-      position = ReadPGN(position);
-      for (size_t i = 0; i < 64; i++) {
-        if (position->board[i].type == 'K') {
-          position->kings[position->board[i].color] = i;
-        }
+      if (!std::filesystem::exists("PGN_position.txt")) {
+        std::cout << "'PGN_position.txt' does not exist. Start new game? ";
+        std::cin >> confirmation;
+      } else {
+        // ReadPosition(*position);
+        position = ReadPGN(position);
+        break;
+        //for (size_t i = 0; i < 64; i++) {
+        //  if (position->board[i].type == 'K') {
+        //    position->kings[position->board[i].color] = (unsigned char)i;
+        //  }
+        //}
       }
     } else {
       if (std::filesystem::exists("PGN_position.txt")) {
@@ -3094,7 +3130,7 @@ int main() {
             << "'PGN_position.txt' already exists. Do you want to replace it? ";
         std::cin >> response;
         while (ToLower(response) != "yes" && ToLower(response) != "no") {
-          std::cout << "'PGN_position.txt' already exists.Do you want to "
+          std::cout << "'PGN_position.txt' already exists. Do you want to "
                        "replace it (please enter \"yes\" or \"no\")? ";
           std::cin >> response;
         }
@@ -3102,12 +3138,12 @@ int main() {
       } else {
         confirmation = true;
       }
-      if (confirmation) {
-        std::ofstream file;
-        file.open("PGN_position.txt");
-        file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round "
-                "\"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
-      }
+    }
+    if (confirmation) {
+      std::ofstream file;
+      file.open("PGN_position.txt");
+      file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round "
+              "\"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
     }
   }
 
@@ -3119,23 +3155,33 @@ int main() {
   // right after each other. For promotions, add =[insert piece type] after the
   // pawn move (such as 1404=Q) piece types are Q, B, R, N.
 
-  char color;
   bool game_over = false;
+  bool engine_white;
+  {
+    std::string response;
   std::cout << "What color am I playing? ";
-  std::cin >> color;
-  color = (char)toupper(color);
-  while (color != 'W' && color != 'B') {
-    std::cout << "What color am I playing (enter \"W\" or \"B\")? ";
-    std::cin >> color;
-    color = (char)toupper(color);
+  std::cin >> response;
+  while (response != "W" && response != "w" && response != "b" &&
+         response != "B") {
+      std::cout << "What color am I playing (please enter \"w\" or \"b\")? ";
+      std::cin >> response;
   }
-  bool engine_white = color == 'W';
-  char bottom_board;
-  std::cout << "What color is on the bottom of the board? ";
-  std::cin >> bottom_board;
-  bool white_on_bottom = bottom_board == 'W' || bottom_board == 'w';
+    engine_white = ((response == "W") || (response == "w"));
+  }
+  bool white_on_bottom;
+  {
+    std::string response;
+    std::cout << "What color is on the bottom of the board? ";
+    std::cin >> response;
+    while (response != "W" && response != "w" && response != "b" &&
+           response != "B") {
+      std::cout << "What color is on the bottom of the board (please enter \"w\" or \"b\")? ";
+      std::cin >> response;
+    }
+    white_on_bottom = ((response == "W") || (response == "w"));
+  }
   const std::regex move_input_regex(R"regex([Oo0]-[Oo0](-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](\=[QRBN])?[+#]?)regex");
-  ThreadInfo* info = new ThreadInfo(position, new bool(false), new TrashType, color);
+  ThreadInfo* info = new ThreadInfo(position, new bool(false), new TrashType, engine_white);
   std::string move;
   Board new_board = position->board;
   bool engine_on = true;
@@ -3185,6 +3231,7 @@ int main() {
   }
   t_c_mutex.unlock();
   _beginthread(calculate_moves, 0, info);
+  std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
   while (true) {
     if (engine_white == position->white_to_move && engine_on) {
       //printf("[main thread %d] block.\n", GetCurrentThreadId());
@@ -3223,6 +3270,12 @@ ComplicatedLessOutcome);
 
         info->trash->emplace_back(position, best_move);
         info->position = best_move;
+        double e = best_move->evaluation;
+        int d = best_move->depth;
+        best_move->depth = -1;
+        minimax(*best_move, d, std::numeric_limits<double>::lowest(), INT_MAX,
+                new bool(false));
+        assert(best_move->evaluation == e);
         // printf("[main thread %d] wakeup.  outcomes=%p, size=%d\n",
         //        GetCurrentThreadId(), info->position->outcomes,
         //        info->position->outcomes->size());
@@ -3277,13 +3330,21 @@ ComplicatedLessOutcome);
     // assert(!stop);
     // HANDLE thread_handle = (HANDLE)_beginthread(Premoves, 0, position);
     std::cout << "Your move: ";
-    std::cin >> move;
+    std::getline(std::cin, move);
 
-     lower_move = ToLower(move);
-    if (lower_move == "disable") {
+     //lower_move = ToLower(move);
+    if (ToLower(move) == "help") {
+      std::cout << "Disable         Turn the engine off.\nEnable          Turn the engine on.\n+N              Seek N moves forward from current position (using PGN file).\n-N              Seek N moves back from current position (using PGN file).\nFlipBoard       Flip the chess board being displayed.\n" << std::endl;
+      continue;
+    } else if (move == "FlipBoard") {
+      white_on_bottom = !white_on_bottom;
+      std::cout << MakeString(*position, white_on_bottom) << std::endl;
+      continue;
+    }
+    else if (move == "Disable") {
       engine_on = false;
       continue;
-    } else if (lower_move == "enable") {
+    } else if (move == "Enable") {
       engine_on = true;
       continue;
     } else if (move.length() == 1) {
@@ -3365,7 +3426,7 @@ ComplicatedLessOutcome);
       // stop_mutex.unlock();
       stop_cv.notify_one();
     } else {
-      std::cout << "Invalid move." << std::endl;
+      std::cout << "Invalid move. Type 'help' to view commands." << std::endl;
     }
     // wait for premoves to finish
     // WaitForSingleObject(thread_handle, INFINITE);

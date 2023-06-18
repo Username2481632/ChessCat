@@ -9,11 +9,11 @@ bool Castling::operator==(const Castling other) const {
          black_o_o == other.black_o_o && black_o_o_o == other.black_o_o_o;
 };
 
-size_t& Kings::operator[](const Color& color) {
+unsigned char& Kings::operator[](const Color& color) {
   return color == Color::White ? white_king : black_king;
 };
 
-Kings::Kings(size_t wk, size_t bk) : white_king(wk), black_king(bk){};
+Kings::Kings(unsigned char wk, unsigned char bk) : white_king(wk), black_king(bk){};
 
 Piece::Piece(const Color& c, const char& t) : color(c), type(t){};
 
