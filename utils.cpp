@@ -12,7 +12,7 @@ size_t char_to_size_t(char c) {
 std::string ToLower(std::string input) {
   std::string output;
   for (size_t i = 0; i < input.length(); i++) {
-    output += tolower(input[i]);
+    output += (char)tolower(input[i]);
   }
   return output;
 }

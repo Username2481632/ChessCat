@@ -2793,9 +2793,9 @@ std::stringstream elements_line(FEN);
 }
 
 
-Position* ReadPGN(Position* position) {
+Position* ReadPGN(Position* position, std::string file_name) {
   std::ifstream file;
-  file.open("PGN_position.txt");
+  file.open(file_name);
   if (!file.is_open()) {
     std::cout << "Failed to open file.";
     exit(1);
@@ -2866,9 +2866,13 @@ std::string Convert(double e) {
   }
 
 
-void UpdatePGN(Position* new_position, std::string move_string) {
+void UpdatePGN(Position* new_position, std::string move_string, std::string slot) {
   std::ifstream file;
-  file.open("PGN_position.txt");
+  file.open(slot + "_PGN_position.txt");
+  if (!file.is_open()) {
+    std::cout << "UpdatePGN could not open file." << std::endl;
+    exit(1);
+  }
   std::string line;
   std::vector<std::string> lines;
   do {
@@ -2919,7 +2923,7 @@ void UpdatePGN(Position* new_position, std::string move_string) {
   file.close();
   lines.emplace_back(line);
   std::ofstream output_file;
-  output_file.open("PGN_position.txt");
+  output_file.open(slot + "_PGN_position.txt");
   for (size_t i = 0; i < lines.size(); i++) {
     output_file << lines[i] << (i != (lines.size() - 1) ? "\n" : "");
   }
@@ -2928,13 +2932,13 @@ void UpdatePGN(Position* new_position, std::string move_string) {
 
 using SeekResult = std::pair<bool, Position*>;
 
-SeekResult SeekPosition(Position* position, int moves) {
+SeekResult SeekPosition(Position* position, int moves, std::string slot) {
   int new_position_number = position->number + moves;
   if (new_position_number < 0) {
     return std::pair(false, position);
   }
   std::ifstream file;
-  file.open("PGN_position.txt");
+  file.open(slot + "_PGN_position.txt");
   if (!file.is_open()) {
     std::cout << "Failed to open file.";
     exit(1);
@@ -3042,6 +3046,40 @@ void LogGameEnd(const Position& position, const int &game_status) {
 //}
 
 
+//std::string GetInput(std::vector<std::string> acceptable_responses,
+//                     std::string question) {
+//  std::string response;
+//  std::cout << question << '?';
+//  std::getline(std::cin, response);
+//  while (std::none_of(acceptable_responses.begin(), acceptable_responses.end(),
+//                      [response](std::string r) { return r == response; })) {
+//    std::cout << question << " (please enter \"" << acceptable_responses[0]
+//              << "\" or \"" << acceptable_responses
+//  }
+//}
+
+const std::regex file_regex(R"regex((.+)_PGN_position.txt)regex");
+
+std::set<std::string> GetSlots() {
+  std::set<std::string> slots;
+  if (!std::filesystem::exists(std::filesystem::current_path() / "games")) {
+    return slots;
+  }
+  std::smatch file_name_match;
+  
+  for (std::filesystem::directory_entry file :
+       std::filesystem::directory_iterator(std::filesystem::current_path() /
+                                           "games")) {
+    std::string x = file.path().filename().string();
+    if (std::regex_search(x, file_name_match, file_regex)) {
+      slots.insert(file_name_match[1].str());
+    } else {
+      std::cout << " [WARNING: UNKNOWN FILE IN GAMES] ";
+    }
+  }
+  //std::sort(slots.begin(), slots.end());
+  return slots;
+}
 
 int main() {
   thread_count++;
@@ -3093,208 +3131,275 @@ int main() {
   //    new Position(to_move == white, number, 0.0, board, castling/*, 0LL*/,
   //                 outcomes /*, previous_move*/, nullptr, 0, /*nullptr,*/ kings,
   //                 IntPoint(-1, -1), 0);
-  Position* position = Position::StartingPosition();
-  //SearchPosition(position, FindMinDepth(*position), new bool(false));
-  //test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
-  //test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
-  std::cout << std::setprecision(7);
+  while (true) {
+    Position* position = Position::StartingPosition();
+    // SearchPosition(position, FindMinDepth(*position), new bool(false));
+    // test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
+    // test_minimax(*position, 4, INT_MIN, INT_MAX, sdt);
+    std::cout << std::setprecision(7);
 
-
-  bool confirmation = false;
-
-  while (!confirmation) {
-    std::string response;
-    std::cout << "Resume? ";
-    std::getline(std::cin, response);
-    while (response != "1" && response != "0") {
-      std::cout << "Resume (please enter 1 or 0)? ";
+    bool confirmation = false;
+    std::string slot;
+    while (!confirmation) {
+      std::string response;
+      std::cout << "Resume? ";
       std::getline(std::cin, response);
-    }
-    if (response == "1") {
-      if (!std::filesystem::exists("PGN_position.txt")) {
-        std::string response;
-        std::cout << "'PGN_position.txt' does not exist. Start new game? ";
-        std::cin >> response;
-        while (ToLower(response) != "yes" && ToLower(response) != "no") {
-          std::cout << "'PGN_position.txt' does not exist. Start new game (please enter \"yes\" or \"no\")? ";
-          std::cin >> response;
-        }
-        confirmation = ToLower(response) == "yes";
-      } else {
-        // ReadPosition(*position);
-        position = ReadPGN(position);
-        break;
-        //for (size_t i = 0; i < 64; i++) {
-        //  if (position->board[i].type == 'K') {
-        //    position->kings[position->board[i].color] = (unsigned char)i;
-        //  }
-        //}
+      while (response != "1" && response != "0") {
+        std::cout << "Resume (please enter 1 or 0)? ";
+        std::getline(std::cin, response);
       }
-    } else {
-      if (std::filesystem::exists("PGN_position.txt")) {
-        std::string response;
-        std::cout
-            << "'PGN_position.txt' already exists. Do you want to replace it? ";
-        std::cin >> response;
-        while (ToLower(response) != "yes" && ToLower(response) != "no") {
-          std::cout << "'PGN_position.txt' already exists. Do you want to "
-                       "replace it (please enter \"yes\" or \"no\")? ";
+      std::set<std::string> numbers = GetSlots();
+      if (response == "1") {
+        if (numbers.size() == 0) {
+          std::cout << "No saved games exist. Start new game? ";
           std::cin >> response;
+          while (ToLower(response) != "yes" && ToLower(response) != "no") {
+            std::cout << "No saved games exist. Start new game (please enter "
+                         "\"yes\" or \"no\")? ";
+            std::cin >> response;
+          }
+          confirmation = ToLower(response) == "yes";
+        } else {
+          std::cout << "Existing slots:\n";
+          size_t n = 0;
+          for (std::string i : numbers) {
+            n++;
+            std::cout << n << ". " << i << std::endl;
+          }
+          /* WIN32_FIND_DATA FindFileData;
+           HANDLE hFind;
+           char* file_name[] = "?";
+           hFind = FindFirstFile(file_name, &FindFileData);*/
+          /*
+          if (std::regex_search(std::string(FindFileData.cFileName), match,
+          file_regex)) { std::cout << match[1] << std::endl;
+          }
+          while (FindNextFile(hFind, &FindFileDate)) {
+            if (std::regex_search(std::string(FindFileData.cFileName), match,
+                                  file_regex)) {
+              std::cout << match[1] << std::endl;
+            }
+          }*/
+          std::cout << "Choose a slot to load from: ";
+          std::getline(std::cin, response);
+          while (!numbers.contains(response)) {
+            std::cout
+                << "Invalid response. Please choose a slot to load from: ";
+            std::getline(std::cin, response);
+          }
+          slot = (std::filesystem::path("games") / response).string();
+
+          // for (auto& p : std::filesystem::directory_iterator())
+          //  ReadPosition(*position);
+          position = ReadPGN(position, slot + "_PGN_position.txt");
+          break;
+          // for (size_t i = 0; i < 64; i++) {
+          //   if (position->board[i].type == 'K') {
+          //     position->kings[position->board[i].color] = (unsigned char)i;
+          //   }
+          // }
         }
-        confirmation = response == "yes";
       } else {
+        // if (std::filesystem::exists("PGN_position.txt")) {
+        //   std::cout
+        //       << "'PGN_position.txt' already exists. Do you want to replace
+        //       it? ";
+        //   std::cin >> response;
+        //   while (ToLower(response) != "yes" && ToLower(response) != "no") {
+        //     std::cout << "'PGN_position.txt' already exists. Do you want to "
+        //                  "replace it (please enter \"yes\" or \"no\")? ";
+        //     std::cin >> response;
+        //   }
+        //   confirmation = response == "yes";
+        // } else {
+        //   confirmation = true;
+        // }
         confirmation = true;
       }
-    }
-    if (confirmation) {
-      std::ofstream file;
-      file.open("PGN_position.txt");
-      file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round "
-              "\"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
-    }
-  }
-
-  // std::cout << InCheck(*position, position->to_move);
-
-  // standard notation: type the coordinates of the starting and end point (such
-  // as 6444 for e4). if you type one more point, that point becomes an empty
-  // square (for en passant). For castling, type the king move and the rook move
-  // right after each other. For promotions, add =[insert piece type] after the
-  // pawn move (such as 1404=Q) piece types are Q, B, R, N.
-
-  bool game_over = false;
-  bool engine_white;
-  {
-    std::string response;
-  std::cout << "What color am I playing? ";
-  std::cin >> response;
-  while (response != "W" && response != "w" && response != "b" &&
-         response != "B") {
-      std::cout << "What color am I playing (please enter \"w\" or \"b\")? ";
-      std::cin >> response;
-  }
-    engine_white = ((response == "W") || (response == "w"));
-  }
-  bool white_on_bottom;
-  {
-    std::string response;
-    std::cout << "What color is on the bottom of the board? ";
-    std::cin >> response;
-    while (response != "W" && response != "w" && response != "b" &&
-           response != "B") {
-      std::cout << "What color is on the bottom of the board (please enter \"w\" or \"b\")? ";
-      std::cin >> response;
-    }
-    white_on_bottom = ((response == "W") || (response == "w"));
-  }
-  const std::regex move_input_regex(R"regex([Oo0]-[Oo0](-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](\=[QRBN])?[+#]?)regex");
-  ThreadInfo* info = new ThreadInfo(position, new bool(false), new TrashType, engine_white);
-  std::string move;
-  Board new_board = position->board;
-  bool engine_on = true;
-  Position* new_position = nullptr;
-  int game_status;
-  std::string lower_move;
-  //new_generate_moves(*position);
-  SeekResult result;
-  std::cout << MakeString(*position, white_on_bottom) << std::endl;
-  min_depth = FindMinDepth(*position);
-  if (engine_white != position->white_to_move) {
-    // minimax(*position, 1, INT_MIN, INT_MAX, info->stop, false); // TODO: delete this line
-    new_generate_moves(*position);
-    game_status = CheckGameOver(position);
-    if (game_status != 2) {
-      game_over = true;
-      switch (game_status) {
-        case -1:
-          std::cout << "Black wins by checkmate." << std::endl;
-          break;
-        case 0:
-          if (position->fifty_move_rule == 50) {
-            std::cout << "Draw by fifty move rule." << std::endl;
-          } else {
-            std::cout << "Draw by stalemate" << std::endl;
+      if (confirmation) {
+        if (numbers.size() == 0) {
+          std::cout << "No slots exist.\n";
+        } else {
+          std::cout << "Existing slots:\n";
+          size_t count = 0;
+          for (std::string n : numbers) {
+            count++;
+            std::cout << "  \"" << n << "\"\n";
           }
-          break;
-        case 1:
-          std::cout << "White wins by checkmate." << std::endl;
-          break;
+        }
+        std::cout << "Choose a slot to save the game in: ";
+        std::getline(std::cin, response);
+        std::string target_slot = response;
+        if (numbers.contains(response)) {
+          std::cout
+              << "This slot is already occupied. Do you want to overwrite it? ";
+          std::getline(std::cin, response);
+          while (ToLower(response) != "yes" && ToLower(response) != "no") {
+            std::cout << "This slot is already occupied. Do you want to "
+                         "overwrite it (please enter \"yes\" or \"no\")? ";
+            std::getline(std::cin, response);
+          }
+          if (ToLower(response) == "no") {
+            confirmation = false;
+            continue;
+          }
+        }
+        slot = (std::filesystem::path("games") / target_slot).string();
+        if (!std::filesystem::exists("games")) {
+          std::filesystem::create_directory("games");
+        }
+        std::ofstream file;
+        file.open(slot + "_PGN_position.txt");
+        file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round "
+                "\"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
       }
     }
-  }
-  SearchPosition(position, 2, info->stop);
-  std::cout << "Material evaluation: " << EvaluateMaterial(*position)
-            << std::endl;
-  std::cout << "Evaluation on depth "
-            << ((position->depth <= 0) ? "?" : std::to_string(position->depth))
-            << ": " << Convert(position->evaluation) << std::endl;
-  std::cout << "Moves: " << position->outcomes->size() << std::endl
-            << "Material: " << (float)CountMaterial(*position) / 2.0
-            << std::endl;
-  t_c_mutex.lock();
-  thread_count++;
-  if (thread_count >= max_threads) {
-    threads_maxed = true;
-  }
-  t_c_mutex.unlock();
-  _beginthread(calculate_moves, 0, info);
-  std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-  while (true) {
-    if (engine_white == position->white_to_move && engine_on) {
-      //printf("[main thread %d] block.\n", GetCurrentThreadId());
-      std::cout << "My move: ";
 
-      {
-        std::unique_lock lk(done_cv_mtx);
-        done_cv.wait(lk, [] { return done; });
+    // std::cout << InCheck(*position, position->to_move);
+
+    // standard notation: type the coordinates of the starting and end point
+    // (such as 6444 for e4). if you type one more point, that point becomes an
+    // empty square (for en passant). For castling, type the king move and the
+    // rook move right after each other. For promotions, add =[insert piece
+    // type] after the pawn move (such as 1404=Q) piece types are Q, B, R, N.
+
+    bool game_over = false;
+    bool engine_white;
+    {
+      std::string response;
+      std::cout << "What color am I playing? ";
+      std::cin >> response;
+      while (response != "W" && response != "w" && response != "b" &&
+             response != "B") {
+        std::cout << "What color am I playing (please enter \"w\" or \"b\")? ";
+        std::cin >> response;
       }
-      waiting.acquire();
+      engine_white = ((response == "W") || (response == "w"));
+    }
+    bool white_on_bottom;
+    {
+      std::string response;
+      std::cout << "What color is on the bottom of the board? ";
+      std::cin >> response;
+      while (response != "W" && response != "w" && response != "b" &&
+             response != "B") {
+        std::cout << "What color is on the bottom of the board (please enter "
+                     "\"w\" or \"b\")? ";
+        std::cin >> response;
+      }
+      white_on_bottom = ((response == "W") || (response == "w"));
+    }
+    const std::regex move_input_regex(
+        R"regex([Oo0]-[Oo0](-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](\=[QRBN])?[+#]?)regex");
+    ThreadInfo* info =
+        new ThreadInfo(position, new bool(false), new TrashType, engine_white);
+    std::string move;
+    Board new_board = position->board;
+    bool engine_on = true;
+    Position* new_position = nullptr;
+    int game_status;
+    std::string lower_move;
+    // new_generate_moves(*position);
+    SeekResult result;
+    std::cout << MakeString(*position, white_on_bottom) << std::endl;
+    min_depth = FindMinDepth(*position);
+    if (engine_white != position->white_to_move) {
+      // minimax(*position, 1, INT_MIN, INT_MAX, info->stop, false); // TODO:
+      // delete this line
+      new_generate_moves(*position);
       game_status = CheckGameOver(position);
-      Position* best_move;
-
       if (game_status != 2) {
-        std::cout << std::endl;
         game_over = true;
-        LogGameEnd(*position, game_status);
-      } else {
-        best_move = GetBestMove(position);
-        if (!best_move->outcomes) {
-          new_generate_moves(*best_move);
+        switch (game_status) {
+          case -1:
+            std::cout << "Black wins by checkmate." << std::endl;
+            break;
+          case 0:
+            if (position->fifty_move_rule == 50) {
+              std::cout << "Draw by fifty move rule." << std::endl;
+            } else {
+              std::cout << "Draw by stalemate" << std::endl;
+            }
+            break;
+          case 1:
+            std::cout << "White wins by checkmate." << std::endl;
+            break;
         }
-        assert(best_move->evaluation == position->evaluation);
-        /*} else {
-  best_move = *std::min_element(position->outcomes->begin(),
-                                position->outcomes->end(),
-ComplicatedLessOutcome);
-}*/
-        std::string move_string =
-            GetMove(*position, *best_move);
+      }
+    }
+    SearchPosition(position, 2, info->stop);
+    std::cout << "Material evaluation: " << EvaluateMaterial(*position)
+              << std::endl;
+    std::cout << "Evaluation on depth "
+              << ((position->depth <= 0) ? "?"
+                                         : std::to_string(position->depth))
+              << ": " << Convert(position->evaluation) << std::endl;
+    std::cout << "Moves: " << position->outcomes->size() << std::endl
+              << "Material: " << (float)CountMaterial(*position) / 2.0
+              << std::endl;
+    t_c_mutex.lock();
+    thread_count++;
+    if (thread_count >= max_threads) {
+      threads_maxed = true;
+    }
+    t_c_mutex.unlock();
+    _beginthread(calculate_moves, 0, info);
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    while (true) {
+      if (engine_white == position->white_to_move && engine_on) {
+        // printf("[main thread %d] block.\n", GetCurrentThreadId());
+        std::cout << "My move: ";
 
-        game_status = CheckGameOver(best_move);
-
-
-        UpdatePGN(best_move, move_string);
-
-        info->trash->emplace_back(position, best_move);
-        info->position = best_move;
-        double e = best_move->evaluation;
-        int d = best_move->depth;
-        best_move->depth = -1;
-        minimax(*best_move, d, std::numeric_limits<double>::lowest(), INT_MAX,
-                new bool(false));
-        assert(best_move->evaluation == e);
-        // printf("[main thread %d] wakeup.  outcomes=%p, size=%d\n",
-        //        GetCurrentThreadId(), info->position->outcomes,
-        //        info->position->outcomes->size());
-        if (!best_move->outcomes) {
-          new_generate_moves(*best_move);
+        {
+          std::unique_lock lk(done_cv_mtx);
+          done_cv.wait(lk, [] { return done; });
         }
-        std::cout << move_string
-                  << std::endl;  // sometimes dies with this line being "the
-                                 // next statement to execute when this thread
-                                 // returns from the current function"
+        waiting.acquire();
+        game_status = CheckGameOver(position);
+        Position* best_move;
+
+        if (game_status != 2) {
+          std::cout << std::endl;
+          game_over = true;
+          LogGameEnd(*position, game_status);
+        } else {
+          best_move = GetBestMove(position);
+          if (!best_move->outcomes) {
+            new_generate_moves(*best_move);
+          }
+          assert(best_move->evaluation == position->evaluation);
+          /*} else {
+    best_move = *std::min_element(position->outcomes->begin(),
+                                  position->outcomes->end(),
+  ComplicatedLessOutcome);
+  }*/
+          std::string move_string = GetMove(*position, *best_move);
+
+          game_status = CheckGameOver(best_move);
+
+          UpdatePGN(best_move, move_string, slot);
+
+          info->trash->emplace_back(position, best_move);
+          info->position = best_move;
+          double e = best_move->evaluation;
+          int d = best_move->depth;
+          best_move->depth = -1;
+          minimax(*best_move, d, std::numeric_limits<double>::lowest(), INT_MAX,
+                  new bool(false));
+          assert(best_move->evaluation == e);
+          // printf("[main thread %d] wakeup.  outcomes=%p, size=%d\n",
+          //        GetCurrentThreadId(), info->position->outcomes,
+          //        info->position->outcomes->size());
+          if (!best_move->outcomes) {
+            new_generate_moves(*best_move);
+          }
+          std::cout << move_string
+                    << std::endl;  // sometimes dies with this line being "the
+                                   // next statement to execute when this thread
+                                   // returns from the current function"
           std::cout << MakeString(*best_move, white_on_bottom) << std::endl;
-          std::cout << "Material evaluation: " << EvaluateMaterial(*best_move) << std::endl;
+          std::cout << "Material evaluation: " << EvaluateMaterial(*best_move)
+                    << std::endl;
           std::cout << "Evaluation on depth "
                     << ((best_move->depth == -1)
                             ? "?"
@@ -3302,165 +3407,291 @@ ComplicatedLessOutcome);
                     << ": " << Convert(best_move->evaluation) << std::endl;
           std::cout << "Line: ";
           std::vector<Position*> line = GetLine(position);
-          //std::cout << "[got line] ";
+          // std::cout << "[got line] ";
           if (line.size() == 0) {
             std::cout << std::endl << "Line was size 0";
             exit(1);
           }
           std::cout << GetMove(*position, *line[0]);
-          //std::cout << "[got first move] ";
+          // std::cout << "[got first move] ";
           for (size_t i = 1; i < line.size(); i++) {
             std::cout << ' ' << GetMove(*line[i - 1], *line[i]);
-            //std::cout << "[got next move] ";
+            // std::cout << "[got next move] ";
           }
-          std::cout/* << "[finished line]"*/ << std::endl;
+          std::cout /* << "[finished line]"*/ << std::endl;
           std::cout << "Moves: " << best_move->outcomes->size() << std::endl
-                    << "Material: " << CountMaterial(*best_move) / 2.0 << std::endl;
-        
-        position = best_move;
-        if (game_status != 2) {
-          game_over = true;
-          LogGameEnd(*position, game_status);
+                    << "Material: " << CountMaterial(*best_move) / 2.0
+                    << std::endl;
+
+          position = best_move;
+          if (game_status != 2) {
+            game_over = true;
+            LogGameEnd(*position, game_status);
+          }
         }
+
+        done = false;
+        // stop_mutex.lock();
+        *info->stop = false;
+        // stop_mutex.unlock();
+        stop_cv.notify_one();
+        /*making_move.unlock();
+        working.unlock();*/
       }
+      // assert(!stop);
+      // HANDLE thread_handle = (HANDLE)_beginthread(Premoves, 0, position);
+      std::cout << "Your move: ";
+      std::getline(std::cin, move);
 
-      done = false;
-      // stop_mutex.lock();
-      *info->stop = false;
-      // stop_mutex.unlock();
-      stop_cv.notify_one();
-      /*making_move.unlock();
-      working.unlock();*/
-
-    }
-    // assert(!stop);
-    // HANDLE thread_handle = (HANDLE)_beginthread(Premoves, 0, position);
-    std::cout << "Your move: ";
-    std::getline(std::cin, move);
-
-     //lower_move = ToLower(move);
-    if (ToLower(move) == "help") {
-      std::cout << "Disable             Turn the engine off.\nEnable           "
-                   "   Turn the "
-                   "engine on.\n+N                  Seek N moves forward from "
-                   "current "
-                   "position (using PGN file).\n-N                  Seek N "
-                   "moves back "
-                   "from current position (using PGN file).\nFlipBoard         "
-                   "  Flip "
-                   "the chess board being displayed.\nPositionLocation    Get "
-                   "the path to the PGN_position.txt file.\nChangeSide          Change the side the engine is playing for.\n"
-          << std::endl;
-      continue;
-    } else if (move == "ChangeSide") {
-      std::string response;
-      std::cout << "What color am I playing? ";
-      std::getline(std::cin, response);
-      while (response != "W" && response != "w" && response != "b" &&
-             response != "B") {
-        std::cout << "What color am I playing (please enter \"w\" or \"b\")? ";
-        getline(std::cin, response);
-      }
-      engine_white = ((response == "W") || (response == "w"));
-      continue;
-    } else if (move == "PositionLocation") {
-      std::cout
-          << "'PGN_position.txt' is located at: "
-          << (std::filesystem::current_path() / "PGN_position.txt").string()
-          << std::endl;
-      continue;
-    } else if (move == "FlipBoard") {
-      white_on_bottom = !white_on_bottom;
-      std::cout << MakeString(*position, white_on_bottom) << std::endl;
-      continue;
-    }
-    else if (move == "Disable") {
-      engine_on = false;
-      continue;
-    } else if (move == "Enable") {
-      engine_on = true;
-      continue;
-    } else if (move.length() == 1) {
-      new_position = nullptr;
-    } else if (move[0] == '+' || move[0] == '-') {
-      result = SeekPosition(
-            position, (move[0] == '+' ? 1 : -1) * stoi(move.substr(1, (move.length() - 1))));
-      if (!result.first) {
-        std::cout << "Invalid seek." << std::endl;
+      lower_move = ToLower(move);
+      if (lower_move == "help") {
+        std::cout
+            << "Disable             Turn the engine off.\nEnable           "
+               "   Turn the "
+               "engine on.\n+N                  Seek N moves forward from "
+               "current "
+               "position (using PGN file).\n-N                  Seek N "
+               "moves back "
+               "from current position (using PGN file).\nFlipBoard         "
+               "  Flip "
+               "the chess board being displayed.\nDeleteSlot          Delete a "
+               "slot.\nChangeSide          Change the side the engine is "
+               "playing "
+               "for.\nRenameSlot          Rename a slot.\nViewCurrentSlot     "
+               "View the current slot being used.\nDuplicateSlot       "
+               "Duplicate "
+               "a slot.\nRenameSlot          Rename a slot.\nRestart             Restart the entire program.\n"
+            << std::endl;
         continue;
-      } else {
+      } else if (lower_move == "renameslot") {
+        std::string response;
+        std::set<std::string> slots = GetSlots();
+        if (slots.size() == 0) {
+          std::cout << "No slots exist." << std::endl;
+          exit(1);
+        }
+        std::cout << "Existing slots:" << std::endl;
+        size_t count = 0;
+        for (std::string s : slots) {
+          count++;
+          std::cout << count << ". " << s << std::endl;
+        }
+        std::cout << "Pick a slot to rename: ";
+        std::getline(std::cin, response);
+        while (!slots.contains(response)) {
+          std::cout << "Pick a slot to rename (please enter a valid slot): ";
+          std::getline(std::cin, response);
+        }
+        std::string to_rename = response;
+        std::cout << "Pick a new name: ";
+        std::getline(std::cin, response);
+        std::string new_name = response;
+        if (std::rename((to_rename + "_PGN_position.txt").c_str(),
+                        (new_name + "_PGN_position.txt").c_str())) {
+          std::cout << "Renaming error.\n";
+        }
+        continue;
+      } else if (lower_move == "duplicateslot") {
+        std::string response;
+        std::set<std::string> slots = GetSlots();
+        if (slots.size() == 0) {
+          std::cout << "No slots exist.\n\n";
+          continue;
+        }
+        std::cout << "Existing slots:" << std::endl;
+        size_t count = 0;
+        for (std::string s : slots) {
+          count++;
+          std::cout << count << ". " << s << std::endl;
+        }
+        std::cout << "Select slot to duplicate: ";
+        std::getline(std::cin, response);
+        while (!slots.contains(response)) {
+          std::cout << "Select slot to duplicate (please enter a valid slot): ";
+          std::getline(std::cin, response);
+        }
+        std::string to_duplicate = response;
+        std::cout << "Name the duplicated file: ";
+        std::getline(std::cin, response);
+        std::string new_name = response;
+        if (slots.contains(response)) {
+          std::cout << "\"" << new_name
+                    << "\" already exists. Do you want to overwrite it? ";
+          std::getline(std::cin, response);
+          while (response != "yes" && response != "no") {
+            std::cout << "\"" << new_name
+                      << "\" already exists. Do you want to overwrite it "
+                         "(please enter \"yes\" or \"no\")? ";
+            std::getline(std::cin, response);
+          }
+          if (response == "no") {
+            continue;
+          }
+        }
+        std::ifstream infile(to_duplicate + "_PGN_position.txt");
+        std::ofstream outfile(new_name + "_PGN_position.txt");
+
+        char c;
+        while (infile.get(c)) {
+          outfile.put(c);
+        }
+
+        infile.close();
+        outfile.close();
+        std::cout << "Slot duplicated successfully." << std::endl;
+        continue;
+      } else if (move == "ChangeSide") {
+        std::string response;
+        std::cout << "What color am I playing? ";
+        std::getline(std::cin, response);
+        while (response != "W" && response != "w" && response != "b" &&
+               response != "B") {
+          std::cout
+              << "What color am I playing (please enter \"w\" or \"b\")? ";
+          getline(std::cin, response);
+        }
+        engine_white = ((response == "W") || (response == "w"));
+        continue;
+      } else if (lower_move == "deleteslot") {
+        std::string response;
+        std::set<std::string> slots = GetSlots();
+        if (slots.size() == 0) {
+          std::cout << "No slots exist." << std::endl;
+          exit(1);
+        }
+        std::cout << "Existing slots:" << std::endl;
+        size_t count = 0;
+        for (std::string s : slots) {
+          count++;
+          std::cout << count << ". " << s << std::endl;
+        }
+        std::cout << "Pick a slot to delete: ";
+        std::getline(std::cin, response);
+        while (!slots.contains(response)) {
+          std::cout << "Pick a slot to delete (please enter a valid slot): ";
+          std::getline(std::cin, response);
+        }
+        std::string to_delete = response;
+        std::cout << "Are you sure you want to delete \"" << to_delete
+                  << "\"? ";
+        std::getline(std::cin, response);
+        while (response != "yes" && response != "no") {
+          std::cout << "Are you sure you want to delete \"" << to_delete
+                    << "\" (please enter \"yes\" or \"no\")?";
+          std::getline(std::cin, response);
+        }
+        if (response == "no") {
+          continue;
+        }
+        remove((to_delete + "_PGN_position.txt").c_str());
+        if (to_delete == slot) {
+          std::cout << "Current slot deleted." << std::endl << "Restart? ";
+          std::getline(std::cin, response);
+          while (response != "1" && response != "0") {
+            std::cout << "Restart (please enter \"1\" or \"0\")? ";
+            std::getline(std::cin, response);
+          }
+          if (response == "0") {
+            exit(0);
+          } else {
+            break;
+          }
+        }
+        continue;
+      } else if (lower_move == "flipboard") {
+        white_on_bottom = !white_on_bottom;
+        std::cout << MakeString(*position, white_on_bottom) << std::endl;
+        continue;
+      } else if (lower_move == "disable") {
         engine_on = false;
-            new_position = result.second;
-            new_position->depth = 0;
-      }
-      stop_mutex.lock();
-      *info->stop = true;
-      stop_mutex.unlock();
-      waiting.acquire();
+        continue;
+      } else if (lower_move == "enable") {
+        engine_on = true;
+        continue;
+      } else if (move.length() == 1) {
+        new_position = nullptr;
+      } else if (move[0] == '+' || move[0] == '-') {
+        result = SeekPosition(position,
+                              (move[0] == '+' ? 1 : -1) *
+                                  stoi(move.substr(1, (move.length() - 1))),
+                              slot);
+        if (!result.first) {
+          std::cout << "Invalid seek." << std::endl;
+          continue;
+        } else {
+          engine_on = false;
+          new_position = result.second;
+          new_position->depth = 0;
+        }
+        stop_mutex.lock();
+        *info->stop = true;
+        stop_mutex.unlock();
+        waiting.acquire();
 
-            std::cout << MakeString(*new_position, white_on_bottom)
-                      << std::endl;
-            std::cout << Convert(new_position->evaluation) << std::endl;
-      game_over = false;
-      info->trash->emplace_back(position, nullptr);
-      position = new_position;
-      info->position = position;
-      min_depth = FindMinDepth(*position);
-      done = false;
-      *info->stop = false;
-      stop_cv.notify_one();
-      continue;
-    } else if (game_over) {
-      new_position = nullptr;
-    } else if (!std::regex_match(move, move_input_regex)) {
-      new_position = nullptr;
-    } else {
-      new_position = MoveToPosition(*position, move);
-    }
-    if (new_position != nullptr) {
-      // Position* played_position = new_position;
-      stop_mutex.lock();
-      *info->stop = true;
-      stop_mutex.unlock();
-      //printf("[main thread %d] acquire.\n", GetCurrentThreadId());
-      waiting.acquire();
-      UpdatePGN(new_position, GetMove(*position, *new_position));
-      if (!new_position->outcomes) {
-        new_generate_moves(*new_position);
-      }
-
-
-
-      //printf("[main thread %d] acquire complete.\n", GetCurrentThreadId());
         std::cout << MakeString(*new_position, white_on_bottom) << std::endl;
-        std::cout << "Material evaluation: " << EvaluateMaterial(*new_position) << std::endl;
-        std::cout << "Evaluation on depth " << ((new_position->depth <= 0)
-            ? "?" : std::to_string(new_position->depth)) << ": "
-                  << Convert(new_position->evaluation) << std::endl;
+        std::cout << Convert(new_position->evaluation) << std::endl;
+        game_over = false;
+        info->trash->emplace_back(position, nullptr);
+        position = new_position;
+        info->position = position;
+        min_depth = FindMinDepth(*position);
+        done = false;
+        *info->stop = false;
+        stop_cv.notify_one();
+        continue;
+      } else if (game_over) {
+        new_position = nullptr;
+      } else if (!std::regex_match(move, move_input_regex)) {
+        new_position = nullptr;
+      } else {
+        new_position = MoveToPosition(*position, move);
+      }
+      if (new_position != nullptr) {
+        // Position* played_position = new_position;
+        stop_mutex.lock();
+        *info->stop = true;
+        stop_mutex.unlock();
+        // printf("[main thread %d] acquire.\n", GetCurrentThreadId());
+        waiting.acquire();
+        UpdatePGN(new_position, GetMove(*position, *new_position), slot);
+        if (!new_position->outcomes) {
+          new_generate_moves(*new_position);
+        }
+
+        // printf("[main thread %d] acquire complete.\n", GetCurrentThreadId());
+        std::cout << MakeString(*new_position, white_on_bottom) << std::endl;
+        std::cout << "Material evaluation: " << EvaluateMaterial(*new_position)
+                  << std::endl;
+        std::cout << "Evaluation on depth "
+                  << ((new_position->depth <= 0)
+                          ? "?"
+                          : std::to_string(new_position->depth))
+                  << ": " << Convert(new_position->evaluation) << std::endl;
         std::cout << "Moves: " << new_position->outcomes->size() << std::endl
                   << "Material: " << (float)CountMaterial(*new_position) / 2.0
                   << std::endl;
 
-      info->trash->emplace_back(position, new_position);
-      position = new_position;
-      info->position = position;
-      if (!new_position->outcomes) {
-        new_generate_moves(*new_position);
-      }
+        info->trash->emplace_back(position, new_position);
+        position = new_position;
+        info->position = position;
+        if (!new_position->outcomes) {
+          new_generate_moves(*new_position);
+        }
 
-      min_depth = FindMinDepth(*position);
-      done = false;
-      // stop_mutex.lock();
-      *info->stop = false;
-      // stop_mutex.unlock();
-      stop_cv.notify_one();
-    } else {
-      std::cout << "Invalid move. Type 'help' to view commands." << std::endl;
+        min_depth = FindMinDepth(*position);
+        done = false;
+        // stop_mutex.lock();
+        *info->stop = false;
+        // stop_mutex.unlock();
+        stop_cv.notify_one();
+      } else {
+        std::cout << "Invalid move. Type 'help' to view commands." << std::endl;
+      }
+      // wait for premoves to finish
+      // WaitForSingleObject(thread_handle, INFINITE);
+      // std::cout << "[main thread] premoves thread ended";
+      // stop = false;
     }
-    // wait for premoves to finish
-    // WaitForSingleObject(thread_handle, INFINITE);
-    // std::cout << "[main thread] premoves thread ended";
-    // stop = false;
   }
 
   return 0;
