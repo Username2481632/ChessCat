@@ -2246,9 +2246,10 @@ struct ThreadInfo {
   Position* position;
   bool* stop;
   TrashType* trash;
-  bool engine_white;
-  ThreadInfo(Position* p, bool* s, TrashType* t, bool ew)
-      : position(p), stop(s), trash(t), engine_white(ew) {}
+  bool* engine_on;
+  bool* engine_white;
+  ThreadInfo(Position* p, bool* s, TrashType* t, bool* eo, bool* ew)
+      : position(p), stop(s), trash(t), engine_on(eo), engine_white(ew) {}
 };
 bool done = false;
 std::condition_variable done_cv;
@@ -2270,6 +2271,9 @@ std::vector<Position*> GetLine(Position* position) {
 }
 
 int CheckGameOver(Position* position) {
+  if (!position->outcomes) {
+    new_generate_moves(*position);
+  }
   if (position->outcomes->size() == 0) {
     if (position->white_to_move && InCheck(*position, Color::White)) {
       return -1;
@@ -2390,7 +2394,7 @@ void calculate_moves(void* varg) {
   while (true) {
     if (!*input->stop) {
 
-      if (input->position->white_to_move == input->engine_white) {
+      if (input->position->white_to_move == *input->engine_white && *input->engine_on) {
          SearchPosition(input->position, min_depth, input->stop);
         // double alpha, beta;
         // double alpha_aspiration_window = aspiration_window;
@@ -2447,7 +2451,7 @@ void calculate_moves(void* varg) {
         new_generate_moves(*input->position);
       }
       if (input->position->white_to_move  ==
-              input->engine_white && /*(input->position->depth >= min_depth ||*/
+              *input->engine_white && /*(input->position->depth >= min_depth ||*/
           input->position->outcomes->size() == 1 /*)*/) {
         input->position->evaluation =
             (*input->position->outcomes)[0]->evaluation;
@@ -2844,8 +2848,6 @@ Position* ReadPGN(Position* position, std::string file_name) {
   return position;
 }
 
-
-
 std::string Convert(double e) {
   int rounding = 10000000;
   std::stringstream output;
@@ -2860,13 +2862,22 @@ std::string Convert(double e) {
     output_string.erase(last_digit);
   }
   return output_string;
+}
 
-
-  
+bool GetEngineColorInput() {
+  std::string response;
+  std::cout << "What color am I playing? ";
+  std::getline(std::cin, response);
+  while (response != "W" && response != "w" && response != "b" &&
+         response != "B") {
+    std::cout << "What color am I playing (please enter \"w\" or \"b\")? ";
+    std::getline(std::cin, response);
   }
+  return ((response == "W") || (response == "w"));
+}
 
-
-void UpdatePGN(Position* new_position, std::string move_string, std::string slot) {
+void UpdatePGN(Position* new_position, std::string move_string,
+               std::string slot) {
   std::ifstream file;
   file.open(slot + "_PGN_position.txt");
   if (!file.is_open()) {
@@ -2885,43 +2896,70 @@ void UpdatePGN(Position* new_position, std::string move_string, std::string slot
   std::smatch moves_match;
   std::string line_copy = line;
   int position_number = 0;
+  std::string new_line = "";
   while (std::regex_search(line_copy, moves_match, moves_regex) &&
          position_number < new_position->number - 1) {
-    for (size_t i = 1; (i < moves_match.size() && moves_match[i].matched); i++) {
-      position_number++;
-      if (position_number == new_position->number - 1) {
-        if (i == 1) {
-          line.erase(line.length() -
-                     (line_copy.length() - moves_match[i].length() - 2 -
-                      std::to_string((int) floor((double)new_position->number / 2.0))
-                          .length()));
-          line += " *";
-        } else {
-          line.erase(line.length() - (moves_match.suffix().str().length() + 1));
-          line += " *";
-        }
-      }
-    }
+    new_line += moves_match[0];
+    //for (size_t i = 1; (i < moves_match.size() && moves_match[i].matched); i++) {
+    //  position_number++;
+    //  if (position_number == new_position->number - 1) {
+    //    if (i == 1) {
+    //      line.erase(line.length() -
+    //                 (line_copy.length() - moves_match[i].length() - 2 -
+    //                  std::to_string((int) floor((double)new_position->number / 2.0))
+    //                      .length()));
+    //      line += " *";
+    //    } else {
+    //      line.erase(line.length() - (moves_match.suffix().str().length() + 1));
+    //      line += " *";
+    //    }
+    //  }
+    //}
     line_copy = moves_match.suffix().str();
   }
   if (!new_position->white_to_move) {
-    if ((line.length() > 1)) {
-      line.insert(
-          (line.length() - 2),
-          " " +
-              std::to_string((int)((double)new_position->number / 2.0 + 0.5)) +
-              ". " + move_string);
-    } else {
-      line.insert(
-          0, std::to_string((int)((double)new_position->number / 2.0 + 0.5)) +
-                 ". " + move_string + " ");
+    if (new_line.length() > 5) { // there are already moves there so a space must be added
+      new_line += " ";
     }
+    new_line += std::to_string((int)((double)new_position->number / 2.0 + 0.5)) +
+        ". " + move_string;
   } else {
-    line.insert(((line.length() > 1) ? (line.length() - 2) : 0),
-                " " + move_string);
+    new_line += " " + move_string;
   }
+  int game_status = CheckGameOver(new_position);
+  switch (game_status) {
+    case 2:
+      new_line += " *";
+      break;
+    case -1:
+      new_line += " 0-1";
+      break;
+    case 0:
+      new_line += " 0-0";
+      break;
+    case 1:
+      new_line += " 1-0";
+      break;
+  }
+
+  //if (!new_position->white_to_move) {
+  //  if ((line.length() > 1)) {
+  //    line.insert(
+  //        (line.length() - 2),
+  //        " " +
+  //            std::to_string((int)((double)new_position->number / 2.0 + 0.5)) +
+  //            ". " + move_string);
+  //  } else {
+  //    line.insert(
+  //        0, std::to_string((int)((double)new_position->number / 2.0 + 0.5)) +
+  //               ". " + move_string + " ");
+  //  }
+  //} else {
+  //  line.insert(((line.length() > 1) ? (line.length() - 2) : 0),
+  //              " " + move_string);
+  //}
   file.close();
-  lines.emplace_back(line);
+  lines.emplace_back(new_line);
   std::ofstream output_file;
   output_file.open(slot + "_PGN_position.txt");
   for (size_t i = 0; i < lines.size(); i++) {
@@ -3151,14 +3189,14 @@ int main() {
       std::set<std::string> numbers = GetSlots();
       if (response == "1") {
         if (numbers.size() == 0) {
-          std::cout << "No saved games exist. Start new game? ";
-          std::cin >> response;
-          while (ToLower(response) != "yes" && ToLower(response) != "no") {
+          std::cout << "No saved games exist.\nStart new game? ";
+          std::getline(std::cin, response);
+          while (ToLower(response) != "0" && ToLower(response) != "1") {
             std::cout << "No saved games exist. Start new game (please enter "
-                         "\"yes\" or \"no\")? ";
-            std::cin >> response;
+                         "\"1\" or \"0\")? ";
+            std::getline(std::cin, response);
           }
-          confirmation = ToLower(response) == "yes";
+          confirmation = ToLower(response) == "1";
         } else {
           std::cout << "Existing slots:\n";
           size_t n = 0;
@@ -3183,8 +3221,7 @@ int main() {
           std::cout << "Choose a slot to load from: ";
           std::getline(std::cin, response);
           while (!numbers.contains(response)) {
-            std::cout
-                << "Invalid response. Please choose a slot to load from: ";
+            std::cout << "This slot does not exist. Please choose a valid slot to load from: ";
             std::getline(std::cin, response);
           }
           slot = (std::filesystem::path("games") / response).string();
@@ -3264,38 +3301,44 @@ int main() {
     // type] after the pawn move (such as 1404=Q) piece types are Q, B, R, N.
 
     bool game_over = false;
-    bool engine_white;
+    bool engine_on;
+    bool engine_color_initialized = false;
     {
       std::string response;
-      std::cout << "What color am I playing? ";
-      std::cin >> response;
-      while (response != "W" && response != "w" && response != "b" &&
-             response != "B") {
-        std::cout << "What color am I playing (please enter \"w\" or \"b\")? ";
-        std::cin >> response;
+      std::cout << "Start with engine enabled? ";
+      std::getline(std::cin, response);
+      while (response != "1" && response != "0") {
+        std::cout
+            << "Start with engine enabled (please enter \"1\" or \"0\")? ";
+        std::getline(std::cin, response);
       }
-      engine_white = ((response == "W") || (response == "w"));
+      engine_on = response == "1";
+    }
+    bool engine_white = true;
+    if (engine_on) {
+      engine_color_initialized = true;
+      engine_white = GetEngineColorInput();
     }
     bool white_on_bottom;
     {
       std::string response;
       std::cout << "What color is on the bottom of the board? ";
-      std::cin >> response;
+      std::getline(std::cin, response);
       while (response != "W" && response != "w" && response != "b" &&
              response != "B") {
         std::cout << "What color is on the bottom of the board (please enter "
                      "\"w\" or \"b\")? ";
-        std::cin >> response;
+        std::getline(std::cin, response);
       }
       white_on_bottom = ((response == "W") || (response == "w"));
     }
+
     const std::regex move_input_regex(
         R"regex([Oo0]-[Oo0](-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](\=[QRBN])?[+#]?)regex");
     ThreadInfo* info =
-        new ThreadInfo(position, new bool(false), new TrashType, engine_white);
+        new ThreadInfo(position, new bool(false), new TrashType, new bool(engine_on), new bool(engine_white));
     std::string move;
     Board new_board = position->board;
-    bool engine_on = true;
     Position* new_position = nullptr;
     int game_status;
     std::string lower_move;
@@ -3347,6 +3390,11 @@ int main() {
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     while (true) {
       if (engine_white == position->white_to_move && engine_on) {
+        if (!engine_color_initialized) {
+          engine_white = GetEngineColorInput();
+          *info->engine_white = engine_white;
+          *info->engine_on = true;
+        }
         // printf("[main thread %d] block.\n", GetCurrentThreadId());
         std::cout << "My move: ";
 
@@ -3540,7 +3588,7 @@ int main() {
         outfile.close();
         std::cout << "Slot duplicated successfully." << std::endl;
         continue;
-      } else if (move == "ChangeSide") {
+      } else if (lower_move == "changeside") {
         std::string response;
         std::cout << "What color am I playing? ";
         std::getline(std::cin, response);
@@ -3551,6 +3599,7 @@ int main() {
           getline(std::cin, response);
         }
         engine_white = ((response == "W") || (response == "w"));
+        *info->engine_white = engine_white;
         continue;
       } else if (lower_move == "deleteslot") {
         std::string response;
