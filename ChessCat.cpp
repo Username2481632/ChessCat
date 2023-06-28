@@ -1844,7 +1844,7 @@ bool IsQuiet(Position* position) {
 }
 
 void minimax(Position& position, int depth, double alpha, double beta,
-             bool* stop/*, bool reasonable_extension*//*, bool selective_deepening*//*, int initial_material*//*, AlphaBeta alpha_beta*/) {
+             bool* stop/*, bool reasonable_extension*//*, bool selective_deepening*//*, int initial_material*//*, AlphaBeta alpha_beta*/, bool quiescence_search) {
   if (*stop || position.depth >= depth) {
      return;
   }
@@ -1892,7 +1892,13 @@ void minimax(Position& position, int depth, double alpha, double beta,
     position.depth = 1000;
     return;
   }
-  if (position.outcomes->size() <= 3) {
+  position.depth = depth;
+  if (depth == 0 && !quiescence_search &&
+      std::none_of(position.outcomes->begin(), position.outcomes->end(),
+                   [](Position* p) { return p->outcomes; })) {
+    return;
+  }
+  if (position.outcomes->size() <= 3 && quiescence_search) {
     depth++;
   }
   //if (depth == 0 && (*position.outcomes)[0]->outcomes) {
@@ -1972,7 +1978,6 @@ void minimax(Position& position, int depth, double alpha, double beta,
   //  std::sort(position.outcomes->begin(), position.outcomes->end(),
   //            position.white_to_move ? GreaterOutcome : LessOutcome);
   //}
-  position.depth = depth;
   for (size_t c = 0; c < position.outcomes->size(); c++) {
 
      if (depth == 0) {
@@ -1984,10 +1989,10 @@ void minimax(Position& position, int depth, double alpha, double beta,
          //assert(round(initial_evaluation) !=
          //       round((*position.outcomes)[c]->evaluation));
          minimax(*(*position.outcomes)[c], depth, alpha, beta, stop/*,
-                 reasonable_extension *//*, initial_material*//*, alpha_beta*/);
+                 reasonable_extension *//*, initial_material*//*, alpha_beta*/, quiescence_search);
        }
      } else {
-       minimax(*(*position.outcomes)[c], depth - 1, alpha, beta, stop/*, alpha_beta*/);
+       minimax(*(*position.outcomes)[c], depth - 1, alpha, beta, stop/*, alpha_beta*/, quiescence_search);
      }
     
      if (position.white_to_move) {
@@ -2238,7 +2243,7 @@ void DeleteOutcomes(void* void_arg) {
 
 
 using TrashType = std::vector<std::pair<Position*, Position*>>;
-//std::mutex working;
+// std::mutex working;
 std::condition_variable stop_cv;
 std::mutex stop_cv_mutex;
 std::binary_semaphore waiting{0};
@@ -2249,8 +2254,9 @@ struct ThreadInfo {
   TrashType* trash;
   bool* engine_on;
   bool* engine_white;
-  ThreadInfo(Position* p, bool* s, TrashType* t, bool* eo, bool* ew)
-      : position(p), stop(s), trash(t), engine_on(eo), engine_white(ew) {}
+  bool* adaptive;
+  ThreadInfo(Position* p, bool* s, TrashType* t, bool* eo, bool* ew, bool* a)
+      : position(p), stop(s), trash(t), engine_on(eo), engine_white(ew), adaptive(a) {}
 };
 bool done = false;
 std::condition_variable done_cv;
@@ -2267,6 +2273,9 @@ std::vector<Position*> GetLine(Position* position) {
   while (position->outcomes && GetBestMove(position)) {
     position = GetBestMove(position);
     line.emplace_back(position);
+  }
+  if (line.size() == 0) {
+    int w = 4;
   }
   return line;
 }
@@ -2308,8 +2317,9 @@ int CheckGameOver(Position* position) {
 
 const double aspiration_window = 0.0025;
 
+const double adaptive_goal = -4;
 
-void SearchPosition(Position* position, int minimum_depth, bool* stop) {
+void SearchPosition(Position* position, int minimum_depth, bool* stop, bool quiescence_search) {
   int depth = position->depth + 1;
   double alpha, beta;
   double alpha_aspiration_window = aspiration_window;
@@ -2329,7 +2339,7 @@ void SearchPosition(Position* position, int minimum_depth, bool* stop) {
       beta = INT_MAX;
     }
     minimax(*position, depth, alpha, beta,
-            stop/*, AlphaBeta()*/);
+            stop/*, AlphaBeta()*/, quiescence_search);
     if (position->evaluation <= alpha) {
       alpha_aspiration_window *= 4; // unexpected advantage for black
     } else if (position->evaluation >= beta) {
@@ -2350,7 +2360,7 @@ uint64_t max_positions = (max_bytes << 1) / (3 * sizeof(Position));
 
 const uint64_t min_bytes = (3U << 30);  // 3221225472
 
-int FindMinDepth(Position& position) {
+int FindMinDepth(Position& position, bool adaptive) {
   if (!position.outcomes) {
     new_generate_moves(position);
   }
@@ -2368,7 +2378,7 @@ int FindMinDepth(Position& position) {
   GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc,
                        sizeof(pmc));
 
-  uint64_t available = statex.ullAvailPhys + pmc.WorkingSetSize;
+  uint64_t available = (statex.ullAvailPhys + pmc.WorkingSetSize)/* / 4*/;
   if (available < min_bytes) {
     std::cout << std::endl << "Not enough RAM available." << std::endl;
     exit(1);
@@ -2376,12 +2386,27 @@ int FindMinDepth(Position& position) {
   min_free = (uint64_t)((double)available * 2.0 / branching_factor);
   max_bytes = available - min_free;
   max_positions = (max_bytes << 1) / (3 * sizeof(Position));
-  
-
-  return (int)std::max(4.0,
-                       round(log2(max_positions) / (log2(branching_factor))));
+  if (adaptive) {
+    int adaptive_eval = (int) round(position.evaluation) + 5;
+    //if (position.depth == -1) {
+    //  SearchPosition(&position, 1, new bool(false), false);
+    //}
+    if (position.white_to_move ? (adaptive_eval > adaptive_goal) : (adaptive_eval < -adaptive_goal)) {
+      max_positions /= (uint64_t)pow(3, abs(adaptive_eval));
+    }
+  }
+  if (!adaptive) {
+    return (int)std::max(4.0,
+                         round(log2(max_positions) / (log2(branching_factor))));
+  } else {
+    return (int)std::max(1.0,
+                         round(log2(max_positions) / (log2(branching_factor))));
+  }
 }
-
+bool AdaptiveGoalReached(Position& position) {
+  return (position.white_to_move ? (round(position.evaluation) <= adaptive_goal)
+                                 : (round(position.evaluation) >= -adaptive_goal));
+}
 
 void calculate_moves(void* varg) {
   //double minimum_time = 3;
@@ -2396,7 +2421,14 @@ void calculate_moves(void* varg) {
     if (!*input->stop) {
 
       if (input->position->white_to_move == *input->engine_white && *input->engine_on) {
-         SearchPosition(input->position, min_depth, input->stop);
+         //assert(input->position->depth > -1);
+         if (AdaptiveGoalReached(*input->position)) {
+          SearchPosition(input->position, min_depth, input->stop, true);
+
+         } else {
+          SearchPosition(input->position, min_depth, input->stop, false);
+
+         }
         // double alpha, beta;
         // double alpha_aspiration_window = aspiration_window;
         // double beta_aspiration_window = aspiration_window;
@@ -2426,21 +2458,23 @@ void calculate_moves(void* varg) {
         done_cv.notify_one();
 
       } else {
-        while (!*input->stop && std::any_of(input->position->outcomes->begin(), input->position->outcomes->end(), [](Position* position){
-          return (position->evaluation < (double)mate / 2.0) &&(position->evaluation > (double)-mate / 2.0);
+        while (!*input->stop && !input->adaptive && std::any_of(input->position->outcomes->begin(), input->position->outcomes->end(), [input](Position* position){
+          return (position->evaluation < (double)mate / 2.0) && (position->evaluation > (double)-mate / 2.0) && (!*input->adaptive || AdaptiveGoalReached(*position));
                             })) {
           std::sort(input->position->outcomes->begin(), input->position->outcomes->end(),
                     input->position->white_to_move ? GreaterOutcome : LessOutcome);
           for (size_t i = 0;
-               i < input->position->outcomes->size() && !*input->stop; i++) {
+               i < input->position->outcomes->size() && !*input->stop && AdaptiveGoalReached(*input->position); i++) {
+            //assert(!input->adaptive);
             SearchPosition(
                 (*input->position->outcomes)[i],
-                std::max(FindMinDepth(*(*input->position->outcomes)[i]),
+                std::max(FindMinDepth(*(*input->position->outcomes)[i], input->adaptive),
                                     (*input->position->outcomes)[i]->depth + 1),
-                           input->stop);  // do position->depth + 1 while
+                           input->stop, true);  // do position->depth + 1 while
                                                  // position->depth < min_depth
           }
         }
+        *input->stop = true;
       }
     }
     if (*input->stop) {
@@ -2575,7 +2609,9 @@ std::string GetMove(Position& position1, Position& position2) {
       output << 'N';
       for (size_t k = 0; k < 8; k++) {
         int new_i = (int)dest + knight_moves[k];
-        if (new_i >= 0 && new_i <= 63 &&
+        if (new_i >= 0 && new_i <= 63 && ((new_i & 7) - ((int)dest & 7)) <= 2 &&
+            (new_i & 7) - ((int)dest & 7) >=
+                    -2 && 
             position1.board[(size_t)new_i].color ==
                     position2.board[dest]
                     .color &&
@@ -2906,7 +2942,18 @@ void UpdatePGN(Position* new_position, std::string move_string,
   std::string new_line = "";
   while (std::regex_search(line_copy, moves_match, moves_regex) &&
          position_number < new_position->number - 1) {
-    new_line += moves_match[0];
+    if (position_number < new_position->number - 2) {
+      new_line += moves_match[0];
+      position_number += 2;
+    } else {
+      if (!new_position->white_to_move) {
+        new_line += std::to_string((int)((double)new_position->number / 2.0)) +
+                    ". " + moves_match[1].str();
+      } else {
+        new_line += moves_match[0];
+      }
+      position_number++;
+    }
     //for (size_t i = 1; (i < moves_match.size() && moves_match[i].matched); i++) {
     //  position_number++;
     //  if (position_number == new_position->number - 1) {
@@ -3043,7 +3090,7 @@ void LogGameEnd(const Position& position, const int &game_status) {
       if (position.fifty_move_rule == 50) {
         std::cout << "Draw by fifty move rule." << std::endl;
       } else if (position.outcomes->size() == 0) {
-        std::cout << "Draw by stalemate" << std::endl;
+        std::cout << "Draw by stalemate." << std::endl;
       } else {
         std::cout << "Draw by repetition." << std::endl;
       }
@@ -3055,6 +3102,7 @@ void LogGameEnd(const Position& position, const int &game_status) {
       std::cout << "Unexpected end of game." << std::endl;
       exit(1);
   }
+  std::cout << "Game over.\n";
 }
 
 
@@ -3230,6 +3278,36 @@ bool DeleteSlot(std::string current_slot) {
   return false;
 }
 
+using PGNTags = std::map<std::string, std::string>;
+
+PGNTags GetPGNTags(std::string slot) {
+  std::string file_name = SlotToPath(slot);
+  std::ifstream file;
+  file.open(file_name);
+  PGNTags tags;
+  if (!file.is_open()) {
+      std::cout << "Failed to open file.";
+      exit(1);
+  }
+  std::string line;
+  std::regex rgx(R"regex(\[(\S+) \"(.*)\"\])regex");
+  do {
+      getline(file, line);
+      if (line[0] != '[') {
+      break;
+      }
+      std::smatch match;
+      if (std::regex_search(line, match, rgx) && match.size() == 3) {
+      tags[match[1]] = match[2];
+      } else {
+      std::cout << "Invalid line: " << line;
+      }
+  } while (line[0] == '[');
+  return tags;
+}
+
+
+
 int main() {
   thread_count++;
   while (true) {
@@ -3312,9 +3390,18 @@ int main() {
             "Start with engine enabled (please enter \"1\" or \"0\")? ",
             {"1", "0"}) == "1";
     bool engine_white = true;
+    bool* adaptive = new bool(false);
     if (engine_on) {
       engine_color_initialized = true;
       engine_white = GetEngineColorInput();
+      adaptive =
+          new bool(GetUserInput("Adaptive? ", "Adaptive (please enter \"1\" or \"0\")? ",
+                       {"1", "0"}) == "1");
+      if (*adaptive) {
+        std::cout << "Note: Adaptive mode decreases engine strength to make "
+                     "the game more fun. Do not use adaptive mode if you want "
+                     "to engine to perform at its peak.\n";
+      }
     }
     bool white_on_bottom =
         GetUserInput("What color is on the bottom of the board? ",
@@ -3325,7 +3412,7 @@ int main() {
     const std::regex move_input_regex(
         R"regex([Oo0]-[Oo0](-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](\=[QRBN])?[+#]?)regex");
     ThreadInfo* info =
-        new ThreadInfo(position, new bool(false), new TrashType, new bool(engine_on), new bool(engine_white));
+        new ThreadInfo(position, new bool(false), new TrashType, new bool(engine_on), new bool(engine_white), adaptive);
     std::string move;
     Board new_board = position->board;
     Position* new_position = nullptr;
@@ -3334,7 +3421,7 @@ int main() {
     // new_generate_moves(*position);
     SeekResult result;
     std::cout << MakeString(*position, white_on_bottom) << std::endl;
-    min_depth = FindMinDepth(*position);
+    min_depth = FindMinDepth(*position, *adaptive);
     if (engine_white != position->white_to_move) {
       // minimax(*position, 1, INT_MIN, INT_MAX, info->stop, false); // TODO:
       // delete this line
@@ -3359,12 +3446,12 @@ int main() {
         }
       }
     }
-    SearchPosition(position, 2, info->stop);
+    SearchPosition(position, (*adaptive ? 1 : 2), info->stop, (!*adaptive || AdaptiveGoalReached(*position)));
     std::cout << "Material evaluation: " << EvaluateMaterial(*position)
               << std::endl;
     std::cout << "Evaluation on depth "
               << ((position->depth <= 0) ? "?"
-                                         : std::to_string(position->depth))
+                                         : (position->depth == 1000 ? "infinity" : std::to_string(position->depth)))
               << ": " << Convert(position->evaluation) << std::endl;
     std::cout << "Moves: " << position->outcomes->size() << std::endl
               << "Material: " << (float)CountMaterial(*position) / 2.0
@@ -3401,6 +3488,9 @@ int main() {
           LogGameEnd(*position, game_status);
         } else {
           best_move = GetBestMove(position);
+          if (*adaptive && !AdaptiveGoalReached(*position) && position->outcomes->size() >= 2) {// && (position->white_to_move ? (position->previous_move->evaluation < position->evaluation) : (position->previous_move->evaluation > position->evaluation))) {
+            best_move = (*position->outcomes)[1];
+          }
           if (!best_move->outcomes) {
             new_generate_moves(*best_move);
           }
@@ -3413,12 +3503,14 @@ int main() {
 
           info->trash->emplace_back(position, best_move);
           info->position = best_move;
-          double e = best_move->evaluation;
-          int d = best_move->depth;
-          best_move->depth = -1;
-          minimax(*best_move, d, std::numeric_limits<double>::lowest(), INT_MAX,
-                  new bool(false));
-          assert(best_move->evaluation == e);
+          //double e = best_move->evaluation;
+          //int d = best_move->depth;
+          //best_move->depth = -1;
+          //minimax(*best_move, d, std::numeric_limits<double>::lowest(), INT_MAX,
+          //        new bool(false));
+          //  assert(best_move->evaluation == e);
+          
+          // doesn't work with adaptive
           if (!best_move->outcomes) {
             new_generate_moves(*best_move);
           }
@@ -3481,8 +3573,52 @@ int main() {
                "View the current slot being used.\nDuplicateSlot       "
                "Duplicate "
                "a slot.\nRenameSlot          Rename a slot.\nRestart           "
-               "  Restart the entire program.\n"
+               "  Restart the entire program.\nChangeGameTags      Change the "
+               "tags stored about the game.\nAddGameTag          Add a tag to "
+               "describe the game.\nDeleteGameTag       Delete a tag from the "
+               "stored game info.\nToMove              View which side is to "
+               "move.\nSetAdaptive         Set adaptive on or off.\nIsAdaptive "
+               "         View whether adaptive mode is on.\n"
             << std::endl;
+        continue;
+      } else if (lower_move == "isadaptive") {
+        std::cout << "Adaptive mode is " << (*adaptive ? "on" : "off") << ".\n";
+      } else if (lower_move == "changeadaptive") {
+        *adaptive = GetUserInput("Adaptive? ",
+                                 "Adaptive (please enter \"1\" or \"0\")? ",
+                                 {"1", "0"}) == "1";
+      } else if (lower_move == "tomove") {
+        std::cout << "It is " << (position->white_to_move ? "white" : "black")
+                  << " to move.\n";
+      } else if (lower_move == "addgametag") {
+        std::cout << "This function is not done." << std::endl;
+        continue;
+      } else if (lower_move == "changegametags") {
+        PGNTags tags = GetPGNTags(slot);
+        Slots tag_keys;
+        for (std::pair<std::string, std::string> pair : tags) {
+          tag_keys.insert(pair.first);
+          std::cout << pair.first << ": \"" << pair.second << "\"" << std::endl;
+        }
+        std::string to_modify =
+            GetUserInput("Select a tag to modify: ",
+                         "Please select a valid tag to modify: ", tag_keys);
+        std::string new_value;
+        std::cout << "Enter a new value: ";
+        std::getline(std::cin, new_value);
+        if (GetUserInput("Are you sure you want to change the value of tag \"" +
+                             to_modify + "\" to \"" + new_value + "\"? ",
+                         "Are you sure you want to change the value of tag \"" +
+                             to_modify + "\" to \"" + new_value +
+                             "\" (please enter \"1\" or \"0\")? ",
+                         {"1", "0"}) ==
+            "1") {
+          tags[to_modify] = new_value;
+        }
+        continue;
+
+      } else if (lower_move == "deletegametag") {
+        std::cout << "This function is not done." << std::endl;
         continue;
       } else if (lower_move == "restart") {
         std::cout << std::endl;
@@ -3542,7 +3678,7 @@ int main() {
         info->trash->emplace_back(position, nullptr);
         position = new_position;
         info->position = position;
-        min_depth = FindMinDepth(*position);
+        min_depth = FindMinDepth(*position, *adaptive);
         done = false;
         *info->stop = false;
         stop_cv.notify_one();
@@ -3583,7 +3719,7 @@ int main() {
           new_generate_moves(*new_position);
         }
 
-        min_depth = FindMinDepth(*position);
+        min_depth = FindMinDepth(*position, *adaptive);
         done = false;
         *info->stop = false;
         stop_cv.notify_one();
