@@ -12,3 +12,5 @@ extern const int king_moves[8];
 extern const int rook_moves[4];
 extern const Board starting_board;
 extern const int mate;
+
+extern const size_t adaptive_off_threshold;

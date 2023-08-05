@@ -41,3 +41,5 @@ const Board starting_board = {
      Piece(Color::White, 'B'), Piece(Color::White, 'Q'),
      Piece(Color::White, 'K'), Piece(Color::White, 'B'),
      Piece(Color::White, 'N'), Piece(Color::White, 'R')}};
+
+const size_t adaptive_off_threshold = 20;
