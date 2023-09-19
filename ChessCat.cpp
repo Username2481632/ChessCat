@@ -1283,10 +1283,6 @@ Position* MoveToPosition(Position& position, const std::string& move) {
   } else {
     info.piece = 'P';
   }
-  if (pieces.count(move[(size_t)current])) {
-    info.promotion = move[(size_t)current];
-    current -= 2;
-  }
   if (move[(size_t)current] == '+') {
     info.check = true;
     current--;
@@ -1294,6 +1290,10 @@ Position* MoveToPosition(Position& position, const std::string& move) {
   if (move[(size_t)current] == '#') {
     info.checkmate = true;
     current--;
+  }
+  if (pieces.count(move[(size_t)current])) {
+    info.promotion = move[(size_t)current];
+    current -= 2;
   }
   info.dest = 8UL * (8UL - char_to_size_t(move[(size_t)current]));
   current--;
@@ -2144,7 +2144,7 @@ void calculate_moves(void* varg) {
               SearchPosition(
                   (*input->position->outcomes)[i],
                   std::max(FindMinDepth(*(*input->position->outcomes)[i],
-                                        input->adaptive),
+                                        *input->adaptive),
                            (*input->position->outcomes)[i]->depth + 1),
                   input->stop, true);
             }  // do position->depth + 1 while
@@ -2618,17 +2618,17 @@ void UpdatePGN(Position* new_position, std::string move_string,
   int position_number = 0;
   std::string new_line = "";
   while (std::regex_search(line_copy, moves_match, moves_regex) &&
-         position_number < new_position->number - 1) {
-    if (position_number < new_position->number - 2) {
+         position_number <= new_position->number - 2) {
+    if (position_number <= new_position->number - 3) {
       new_line += moves_match[0];
       position_number += 2;
     } else {
-      if (!new_position->white_to_move) {
-        new_line += std::to_string((int)((double)new_position->number / 2.0)) +
-                    ". " + moves_match[1].str();
-      } else {
-        new_line += moves_match[0];
-      }
+      //if (!new_position->white_to_move) {
+      new_line += std::to_string((int)((double)new_position->number / 2.0)) +
+                  ". " + moves_match[1].str() + " ";
+      //} else {
+        //new_line += moves_match[1];
+      //}
       position_number++;
     }
     //for (size_t i = 1; (i < moves_match.size() && moves_match[i].matched); i++) {
@@ -2724,6 +2724,7 @@ SeekResult SeekPosition(Position* position, int moves, std::string slot) {
     for (size_t i = 1; (i < moves_match.size() && moves_match[i].matched); i++) {
       position_number++;
       new_generate_moves(*new_position);
+      assert(MoveToPosition(*new_position, moves_match[i]));
       new_position = MoveToPosition(*new_position, moves_match[i]);
       if (position_number == new_position_number) {
         break;
@@ -2983,84 +2984,131 @@ PGNTags GetPGNTags(std::string slot) {
   return tags;
 }
 
+void ShowMaterialEvaluation(Position& position) {
+  std::cout << "Material evaluation: " << EvaluateMaterial(position)
+            << std::endl;
+}
+void ShowEngineEvaluation(Position& position) {
+  std::cout << "Evaluation on depth "
+            << ((position.depth == -1) ? "?" : std::to_string(position.depth))
+            << ": " << Convert(position.evaluation) << std::endl;
+}
+void ShowEngineLine(Position& position) {
+  std::cout << "Line: ";
+  std::vector<Position*> line = GetLine(&position);
+  // std::cout << "[got line] ";
+  if (line.size() == 0) {
+      std::cout << std::endl << "Line was size 0";
+      exit(1);
+  }
+  std::cout << GetMove(position, *line[0]);
+  // std::cout << "[got first move] ";
+  for (size_t i = 1; i < line.size(); i++) {
+      std::cout << ' ' << GetMove(*line[i - 1], *line[i]);
+  }
+  std::cout /* << "[finished line]"*/ << std::endl;
+}
+void ShowMoveCount(Position& position) {
+  std::cout << "Moves: " << position.outcomes->size() << std::endl;
+}
+void ShowMaterialCount(Position& position) {
+  std::cout << "Material: " << CountMaterial(position) / 2.0 << std::endl;
+}
+
+void DisplayStats(Position& position, Tools tools) {
+  for (size_t i = 0; i < tools.size(); i++) {
+      if (tools[i].on) {
+      tools[i].display(position);
+      }
+  }
+}
 
 
 int main() {
   thread_count++;
-  while (true) {
-    Position* position = Position::StartingPosition();
-    std::cout << std::setprecision(7);
+  // while (true) {
+  Position* position = Position::StartingPosition();
+  std::cout << std::setprecision(7);
 
-    bool confirmation = false;
-    std::string slot;
-    while (!confirmation) {
+  bool confirmation = false;
+  std::string slot;
+  while (!confirmation) {
       std::string response;
       std::cout << "Resume? ";
       std::getline(std::cin, response);
       while (response != "1" && response != "0") {
-        std::cout << "Resume (please enter 1 or 0)? ";
-        std::getline(std::cin, response);
+      std::cout << "Resume (please enter 1 or 0)? ";
+      std::getline(std::cin, response);
       }
       std::set<std::string> numbers = GetSlots();
       if (response == "1") {
-        if (numbers.size() == 0) {
-          confirmation = GetUserInput("No saved games exist.\nStart new game? ",
-                                      "No saved games exist.\nStart new game "
-                                      "(please enter \"1\" or \"0\")? ",
-                                      {"1", "0"}) == "1";
-        } else {
-          LogSlots(numbers);
-          std::cout << "Choose a slot to load from: ";
-          std::getline(std::cin, response);
-          while (!numbers.contains(response)) {
-            std::cout << "This slot does not exist. Please choose a valid slot to load from: ";
-            std::getline(std::cin, response);
-          }
-          slot = response;
-          position = ReadPGN(position, SlotToPath(slot));
-          break;
-        }
+      if (numbers.size() == 0) {
+        confirmation = GetUserInput("No saved games exist.\nStart new game? ",
+                                    "No saved games exist.\nStart new game "
+                                    "(please enter \"1\" or \"0\")? ",
+                                    {"1", "0"}) == "1";
       } else {
-        confirmation = true;
+        LogSlots(numbers);
+        std::cout << "Choose a slot to load from: ";
+        std::getline(std::cin, response);
+        while (!numbers.contains(response)) {
+          std::cout << "This slot does not exist. Please choose a valid slot "
+                       "to load from: ";
+          std::getline(std::cin, response);
+        }
+        slot = response;
+        position = ReadPGN(position, SlotToPath(slot));
+        break;
+      }
+      } else {
+      confirmation = true;
       }
       if (confirmation) {
-        if (numbers.size() == 0) {
-          std::cout << "No slots exist.\n";
-        }
-        LogSlots(numbers);
-        std::cout << "Choose a slot to save the game in: ";
-        std::getline(std::cin, response);
-        std::string target_slot = response;
-        if (numbers.contains(response)) {
-          if (GetUserInput("This slot is already occupied. Do you want "
-                                   "to overwrite it? ", "This slot is already occupied. Do you want "
-                                   "to overwrite it (please enter \"yes\" or \"no\")? ",
-                                   {"yes", "no"}) == "no") {
-            confirmation = false;
-            continue;
-          }
-        }
-        slot = target_slot;
-        if (!std::filesystem::exists("games")) {
-          std::filesystem::create_directory("games");
-        }
-        std::ofstream file;
-        file.open(SlotToPath(slot));
-        file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round "
-                "\"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
+      if (numbers.size() == 0) {
+        std::cout << "No slots exist.\n";
       }
-    }
+      LogSlots(numbers);
+      std::cout << "Choose a slot to save the game in: ";
+      std::getline(std::cin, response);
+      std::string target_slot = response;
+      if (numbers.contains(response)) {
+        if (GetUserInput("This slot is already occupied. Do you want "
+                         "to overwrite it? ",
+                         "This slot is already occupied. Do you want "
+                         "to overwrite it (please enter \"yes\" or \"no\")? ",
+                         {"yes", "no"}) == "no") {
+          confirmation = false;
+          continue;
+        }
+      }
+      slot = target_slot;
+      if (!std::filesystem::exists("games")) {
+        std::filesystem::create_directory("games");
+      }
+      std::ofstream file;
+      file.open(SlotToPath(slot));
+      file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round "
+              "\"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n\n*";
+      }
+  }
 
-    // std::cout << InCheck(*position, position->to_move);
+  // std::cout << InCheck(*position, position->to_move);
 
-    // standard notation: type the coordinates of the starting and end point
-    // (such as 6444 for e4). if you type one more point, that point becomes an
-    // empty square (for en passant). For castling, type the king move and the
-    // rook move right after each other. For promotions, add =[insert piece
-    // type] after the pawn move (such as 1404=Q) piece types are Q, B, R, N.
-
-    bool game_over = false;
-    bool engine_color_initialized = false;
+  // standard notation: type the coordinates of the starting and end point
+  // (such as 6444 for e4). if you type one more point, that point becomes an
+  // empty square (for en passant). For castling, type the king move and the
+  // rook move right after each other. For promotions, add =[insert piece
+  // type] after the pawn move (such as 1404=Q) piece types are Q, B, R, N.
+  bool game_over = false;
+  bool engine_color_initialized = false;
+  Tools tools = {Tool(std::string("ShowMaterialEvaluation"), &ShowMaterialEvaluation, false),
+                 Tool(std::string("ShowEngineEvaluation"),
+                      &ShowEngineEvaluation, true),
+      Tool(std::string("ShowEngineLine"), &ShowEngineLine,
+           false),
+      Tool(std::string("ShowMoveCount"), &ShowMoveCount, false),
+      Tool(std::string("ShowMaterialCount"), &ShowMaterialCount,
+           false)};
     bool engine_on =
         GetUserInput(
             "Start with engine enabled? ",
@@ -3093,6 +3141,8 @@ int main() {
     std::string move;
     Board new_board = position->board;
     Position* new_position = nullptr;
+
+
     int game_status;
     std::string lower_move;
     // new_generate_moves(*position);
@@ -3124,15 +3174,7 @@ int main() {
       }
     }
     SearchPosition(position, (*adaptive ? 1 : 2), info->stop, (!*adaptive || AdaptiveGoalReached(*position)));
-    std::cout << "Material evaluation: " << EvaluateMaterial(*position)
-              << std::endl;
-    std::cout << "Evaluation on depth "
-              << ((position->depth <= 0) ? "?"
-                                         : (position->depth == 1000 ? "infinity" : std::to_string(position->depth)))
-              << ": " << Convert(position->evaluation) << std::endl;
-    std::cout << "Moves: " << position->outcomes->size() << std::endl
-              << "Material: " << (float)CountMaterial(*position) / 2.0
-              << std::endl;
+    DisplayStats(*position, tools);
     t_c_mutex.lock();
     thread_count++;
     if (thread_count >= max_threads) {
@@ -3142,15 +3184,15 @@ int main() {
     _beginthread(calculate_moves, 0, info);
     //std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     while (true) {
+      if (!engine_color_initialized && engine_on) {
+        engine_white = GetEngineColorInput();
+        *info->engine_white = engine_white;
+        *info->engine_on = true;
+      }
       if (CountMaterial(*position) < adaptive_off_threshold) {
         *adaptive = false;
       }
       if (engine_white == position->white_to_move && engine_on) {
-        if (!engine_color_initialized) {
-          engine_white = GetEngineColorInput();
-          *info->engine_white = engine_white;
-          *info->engine_on = true;
-        }
         // printf("[main thread %d] block.\n", GetCurrentThreadId());
         std::cout << "My move: ";
 
@@ -3197,29 +3239,7 @@ int main() {
           std::cout << move_string
                     << std::endl;
           std::cout << MakeString(*best_move, white_on_bottom) << std::endl;
-          std::cout << "Material evaluation: " << EvaluateMaterial(*best_move)
-                    << std::endl;
-          std::cout << "Evaluation on depth "
-                    << ((best_move->depth == -1)
-                            ? "?"
-                            : std::to_string(best_move->depth))
-                    << ": " << Convert(best_move->evaluation) << std::endl;
-          std::cout << "Line: ";
-          std::vector<Position*> line = GetLine(position);
-          // std::cout << "[got line] ";
-          if (line.size() == 0) {
-            std::cout << std::endl << "Line was size 0";
-            exit(1);
-          }
-          std::cout << GetMove(*position, *line[0]);
-          // std::cout << "[got first move] ";
-          for (size_t i = 1; i < line.size(); i++) {
-            std::cout << ' ' << GetMove(*line[i - 1], *line[i]);
-          }
-          std::cout /* << "[finished line]"*/ << std::endl;
-          std::cout << "Moves: " << best_move->outcomes->size() << std::endl
-                    << "Material: " << CountMaterial(*best_move) / 2.0
-                    << std::endl;
+          DisplayStats(*best_move, tools);
 
           position = best_move;
           if (game_status != 2) {
@@ -3258,11 +3278,66 @@ int main() {
                "describe the game.\nDeleteGameTag       Delete a tag from the "
                "stored game info.\nToMove              View which side is to "
                "move.\nSetAdaptive         Set adaptive on or off.\nIsAdaptive "
-               "         View whether adaptive mode is on.\n"
+               "         View whether adaptive mode is on.\nShowTools           Choose which tools should be displayed."
             << std::endl;
         continue;
-      } else if (lower_move == "isadaptive") {
+      } else if (lower_move == "showtools") {
+        std::cout << "Available tools:\n";
+        size_t indent = 10;
+        for (size_t i = 0; i < tools.size(); i++) {
+          if (tools[i].name.length() + 5 > indent) {
+            indent = tools[i].name.length() + 5;
+          }
+        }
+        Slots tool_set;
+
+        for (size_t i = 0; i < tools.size(); i++) {
+          tool_set.insert(tools[i].name);
+          std::cout << tools[i].name
+                    << (indent - tools[i].name.length()) * ' '
+                    << tools[i].on;
+        }
+
+        std::string selected_tool = GetUserInput(
+            "Select a tool to toggle: ",
+            "Select a tool to toggle (please enter a valid tool): ", tool_set);
+        size_t index = 0;
+        for (;; index++) {
+          assert(index < tools.size());
+          if (tools[index].name == selected_tool) {
+            break;
+          }
+        }
+        tools[index].on =
+            GetUserInput(
+            "Do you want this tool on? ",
+            "Do you want this tool on (please enter \"1\" or \"0\")? ",
+                {"1", "0"}) == "1";
+        continue;
+      }
+/*
+        show_engine_evaluation =
+            GetUserInput("Do you want to display the engine's evaluation? ",
+                         "Do you want to display the engine's evaluation (please "
+                         "enter \"1\" or \"0\")? ",
+                         {"1", "0"}) == "1";
+        continue;
+      } else if (lower_move == "showmovecount") {
+        show_move_count =
+            GetUserInput("Do you want to display the move count? ",
+                         "Do you want to display the move count (please "
+                         "enter \"1\" or \"0\")? ",
+                         {"1", "0"}) == "1";
+        continue;
+      } else if (lower_move == "showmaterialeval") {
+        show_material_evaluation = GetUserInput("Do you want to display the material evaluation? ",
+                                 "Do you want to display the material evaluation (please "
+                                 "enter \"1\" or \"0\")? ",
+                                 {"1", "0"}) == "1";
+        continue;
+      } */else if (lower_move == "isadaptive") {
         std::cout << "Adaptive mode is " << (*adaptive ? "on" : "off") << ".\n";
+        continue;
       } else if (lower_move == "changeadaptive") {
         *adaptive = GetUserInput("Adaptive? ",
                                  "Adaptive (please enter \"1\" or \"0\")? ",
@@ -3304,8 +3379,8 @@ int main() {
         std::cout << "This function is not done." << std::endl;
         continue;
       } else if (lower_move == "restart") {
-        std::cout << std::endl;
-        break;
+        std::cout << "This function has not been completed yet." << std::endl;
+        continue;
       } else if (lower_move == "renameslot") {
         RenameSlot(slot);
         continue;
@@ -3322,7 +3397,8 @@ int main() {
         continue;
       } else if (lower_move == "deleteslot") {
         if (DeleteSlot(slot)) {
-          break;
+          std::cout << "Restarting has not been implemented yet. The program will now exit.\n";
+          return 0;
         };
         continue;
       } else if (lower_move == "flipboard") {
@@ -3384,16 +3460,8 @@ int main() {
         }
 
         std::cout << MakeString(*new_position, white_on_bottom) << std::endl;
-        std::cout << "Material evaluation: " << EvaluateMaterial(*new_position)
-                  << std::endl;
-        std::cout << "Evaluation on depth "
-                  << ((new_position->depth <= 0)
-                          ? "?"
-                          : std::to_string(new_position->depth))
-                  << ": " << Convert(new_position->evaluation) << std::endl;
-        std::cout << "Moves: " << new_position->outcomes->size() << std::endl
-                  << "Material: " << (float)CountMaterial(*new_position) / 2.0
-                  << std::endl;
+        DisplayStats(*new_position, tools);
+
 
         info->trash->emplace_back(position, new_position);
         position = new_position;
@@ -3410,7 +3478,7 @@ int main() {
         std::cout << "Invalid move. Type 'help' to view commands." << std::endl;
       }
     }
-  }
+  //}
 
   return 0;
 }

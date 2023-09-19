@@ -4,6 +4,8 @@
 #include <map>
 #include <set>
 #include <vector>
+#include <string>
+
 
 // enum class PieceType : char { Empty, Rook, Knight, Bishop, Queen, King, Pawn
 // }; enum class ColorType : char { White, Black }; struct Piece {

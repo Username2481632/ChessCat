@@ -29,3 +29,12 @@ struct Position {
   Position* CreateDeepCopy();  
   Position* RealDeepCopy() const;
 };
+
+struct Tool {
+  std::string name;
+  void (*display)(Position&);
+  bool on;
+  //Tool(const std::string& n, void (*d)(Position&), const bool& o)
+  //    : name(n), display(d), on(o){};
+};
+using Tools = std::array<Tool, 5>;
