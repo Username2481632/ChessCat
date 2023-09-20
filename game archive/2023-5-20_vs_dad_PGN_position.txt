@@ -1,9 +1,0 @@
-[Event "?"]
-[Site "?"]
-[Date "2023.05.20"]
-[Round "?"]
-[White "?"]
-[Black "?"]
-[Result "0-1"]
-
-1. e4 Nc6 2. c4 e6 3. Nc3 Bb4 4. Qa4 Nf6 5. Nf3 Bxc3 6. bxc3 Nxe4 7. Bd3 Nc5 8. Qa3 Nxd3+ 9. Ke2 Nf4+ 10. Ke1 Nxg2+ 11. Kf1 Nh4 12. Nxh4 Qxh4 13. Rg1 Qxc4+ 14. Ke1 Qe4+ 15. Kd1 Qf3+ 16. Kc2 Qxf2 17. Rxg7 Qxh2 18. c4 Qf4 19. Qd3 Nb4+ 20. Kc3 Nxd3 21. Kxd3 Qe5 22. Rxf7 Qxa1 23. Rf1 Qxa2 24. Ke4 Qxc4+ 25. Ke5 d6+ 26. Kf6 Qg4 27. d4 Qg6# *

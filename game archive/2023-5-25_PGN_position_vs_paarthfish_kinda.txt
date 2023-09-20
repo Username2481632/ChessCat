@@ -1,9 +1,0 @@
-[Event "?"]
-[Site "?"]
-[Date "????.??.??"]
-[Round "?"]
-[White "?"]
-[Black "?"]
-[Result "*"]
-
-1. e4 e5 2. Qh5 Bd6 3. Bc4 g6 4. Qf3 f5 *
