@@ -24,10 +24,10 @@
 #include <string>
 #include <vector>
 
+#include "types.h"
+#include "position.h"
 #include "constants.h"
 #include "get_check_info.h"
-#include "position.h"
-#include "types.h"
 #include "utils.h"
 #undef min
 #undef max
