@@ -365,3 +365,9 @@ FodyWeavers.xsd
 # My games (not for sharing)
 games
 game_archive
+
+# For exporting as one file
+package.json
+package-lock.json
+merger.js
+source.cpp
