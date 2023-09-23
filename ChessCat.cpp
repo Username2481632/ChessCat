@@ -2082,6 +2082,8 @@ bool AdaptiveGoalReached(Position& position) {
                                  : (round(position.evaluation) >= -adaptive_goal));
 }
 
+std::string games_folder_path;
+
 void calculate_moves(void* varg) {
   //double minimum_time = 3;
   //int64_t max_memory = 13;
@@ -2197,10 +2199,10 @@ void calculate_moves(void* varg) {
   }
   
 }
-const std::string game_folder = "games";
+const std::string game_folder_name = "games";
 
 std::string SlotToPath(std::string slot) {
-  return (std::filesystem::path(game_folder) / std::filesystem::path(slot))
+  return (std::filesystem::path(games_folder_path) / std::filesystem::path(slot))
              .string() +
          "_PGN_position.txt";
 }
@@ -2819,14 +2821,13 @@ const std::regex file_regex(R"regex((.+)_PGN_position.txt)regex");
 using Slots = std::set<std::string>;
 Slots GetSlots() {
   std::set<std::string> slots;
-  if (!std::filesystem::exists(std::filesystem::current_path() / "games")) {
+  if (!std::filesystem::exists(games_folder_path)) {
     return slots;
   }
   std::smatch file_name_match;
   
   for (std::filesystem::directory_entry file :
-       std::filesystem::directory_iterator(std::filesystem::current_path() /
-                                           game_folder)) {
+       std::filesystem::directory_iterator(games_folder_path)) {
     std::string x = file.path().filename().string();
     if (std::regex_search(x, file_name_match, file_regex)) {
       slots.insert(file_name_match[1].str());
@@ -3029,7 +3030,14 @@ int main() {
   // while (true) {
   Position* position = Position::StartingPosition();
   std::cout << std::setprecision(7);
-
+std::string data_path = 
+  AppDataPath() + (char)std::filesystem::path::preferred_separator + "ChessCat";
+if (!std::filesystem::exists(data_path)) {
+      std::filesystem::create_directory(data_path);
+  }
+  games_folder_path = data_path +
+                      (char)std::filesystem::path::preferred_separator +
+                      game_folder_name;
   bool confirmation = false;
   std::string slot;
   while (!confirmation) {
@@ -3082,8 +3090,9 @@ int main() {
         }
       }
       slot = target_slot;
-      if (!std::filesystem::exists("games")) {
-        std::filesystem::create_directory("games");
+
+      if (!std::filesystem::exists(games_folder_path)) {
+        std::filesystem::create_directory(games_folder_path);
       }
       std::ofstream file;
       file.open(SlotToPath(slot));

@@ -31,3 +31,13 @@ std::string GetUserInput(std::string question, std::string error_message,
   }
   return response;
 }
+
+
+std::string AppDataPath() {
+  char* buf;
+  size_t len;
+  _dupenv_s(&buf, &len, "APPDATA");
+  std::string path(buf);
+  free(buf);
+  return path;
+}
