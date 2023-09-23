@@ -3001,8 +3001,8 @@ void ShowEngineLine(Position& position) {
   std::vector<Position*> line = GetLine(&position);
   // std::cout << "[got line] ";
   if (line.size() == 0) {
-      std::cout << std::endl << "Line was size 0";
-      exit(1);
+      std::cout << "No line predicted.\n";
+      return;
   }
   std::cout << GetMove(position, *line[0]);
   // std::cout << "[got first move] ";
@@ -3433,7 +3433,7 @@ if (!std::filesystem::exists(data_path)) {
         continue;
       } else if (move.length() == 1) {
         new_position = nullptr;
-      } else if (move[0] == '+' || move[0] == '-') {
+      } else if (move[0] == '+' || move[0] == '-' && move.length() > 1 &&  std::all_of(move.begin() + 1, move.end(), isdigit)) {
         result = SeekPosition(position,
                               (move[0] == '+' ? 1 : -1) *
                                   stoi(move.substr(1, (move.length() - 1))),
