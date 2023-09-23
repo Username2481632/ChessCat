@@ -661,23 +661,26 @@ void new_generate_moves(Position& position) {
           new_i = (int)i + multiplier;
           if (new_i < 8 || new_i > 55) {
           // promotion
-          for (size_t k = 0; k < 4; k++) {
-            // one square
+            // forward
+          
             if (position.board[(size_t)new_i].color == Color::Empty &&
                 MoveOk(check_info, i, (size_t)new_i)) {
+            for (size_t k = 0; k < 4; k++) {
               new_position = base_position.CreateDeepCopy();
               new_position->board[(size_t)new_i].color =
                   new_position->board[i].color;
               new_position->board[(size_t)new_i].type = promotion_pieces[k];
               new_position->board[i].Empty();
-              new_position->evaluation += piece_values[promotion_pieces[k]] - 1;
+              new_position->evaluation += (position.white_to_move ? (piece_values[promotion_pieces[k]] - 1) : (-piece_values[promotion_pieces[k]] + 1));
               new_position->was_capture = true;
               new_position->fifty_move_rule = 0;
               moves++;
               position.outcomes->emplace_back(new_position);
             }
+            }
             // captures to the left
             if (left_capture && MoveOk(check_info, i, (size_t)new_i - 1)) {
+            for (size_t k = 0; k < 4; k++) {
               new_position = base_position.CreateDeepCopy();
               new_position->board[(size_t)new_i - 1].color =
                   new_position->board[i].color;
@@ -697,8 +700,10 @@ void new_generate_moves(Position& position) {
               moves++;
               position.outcomes->emplace_back(new_position);
             }
+            }
             // captures to the right
             if (right_capture && MoveOk(check_info, i, (size_t)new_i + 1)) {
+            for (size_t k = 0; k < 4; k++) {
               new_position = base_position.CreateDeepCopy();
               new_position->board[(size_t)new_i + 1].color =
                   new_position->board[i].color;
@@ -718,7 +723,8 @@ void new_generate_moves(Position& position) {
               moves++;
               position.outcomes->emplace_back(new_position);
             }
-          }
+            }
+          
           } else {
           if (position.board[(size_t)new_i].color == Color::Empty) {
             // one square forward
