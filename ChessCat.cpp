@@ -2552,12 +2552,11 @@ Position* ReadPGN(Position* position, std::string file_name) {
   if (moves_line == "*") {
     return position;
   }
-  std::regex moves_regex(
-      R"regex(\d{1,}\.{1,3}\s?(?:([Oo0]-[Oo0](?:-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:\=[QRBN])?[+#]?)(?:\s?\{.+?\})?(?:\s(?:1-0|0-1|1\/2-1\/2))?\s?)(?:([Oo0]-[Oo0](?:-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:\=[QRBN])?[+#]?)(?:\s?\{.+?\})?(?:\s(?:1-0|0-1|1\/2-1\/2))?\s?)?)regex");
+
   std::smatch moves_match;
   std::string moves_line_copy = moves_line;
   int position_number = 0;
-  while (std::regex_search(moves_line_copy, moves_match, moves_regex)) {
+  while (std::regex_search(moves_line_copy, moves_match, PGN_moves_regex)) {
     for (size_t i = 1; (i < moves_match.size() && moves_match[i].matched); i++) {
       position_number++;
       new_generate_moves(*position);
@@ -3146,8 +3145,7 @@ if (!std::filesystem::exists(data_path)) {
                      "\"w\" or \"b\")? ",
                      {"w", "b"}) == "w";
 
-    const std::regex move_input_regex(
-        R"regex([Oo0]-[Oo0](-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](\=[QRBN])?[+#]?)regex");
+
     ThreadInfo* info =
         new ThreadInfo(position, new bool(false), new TrashType, new bool(engine_on), new bool(engine_white), adaptive);
     std::string move;

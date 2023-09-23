@@ -1,7 +1,7 @@
 #pragma once
 
 #include <map>
-
+#include <regex>
 #include "types.h"
 
 extern std::map<char, double> piece_values;
@@ -14,3 +14,5 @@ extern const Board starting_board;
 extern const int mate;
 
 extern const double adaptive_off_threshold;
+const std::regex move_input_regex;
+std::regex PGN_moves_regex;
