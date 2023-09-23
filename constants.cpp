@@ -44,6 +44,6 @@ const Board starting_board = {
 
 const double adaptive_off_threshold = 20.0;
 const std::regex move_input_regex(
-    R"regex([Oo0]-[Oo0](-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](\=[QRBN])?[+#]?)regex");
+    R"regex([Oo0]-[Oo0](-[Oo0])?|[kqrbn]?[a-h]?[1-8]?x?[a-h][1-8](\=[qrbn])?[+#]?)regex");
 const std::regex PGN_moves_regex(
     R"regex(\d{1,}\.{1,3}\s?(?:([Oo0]-[Oo0](?:-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:\=[QRBN])?[+#]?)(?:\s?\{.+?\})?(?:\s(?:1-0|0-1|1\/2-1\/2))?\s?)(?:([Oo0]-[Oo0](?:-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:\=[QRBN])?[+#]?)(?:\s?\{.+?\})?(?:\s(?:1-0|0-1|1\/2-1\/2))?\s?)?)regex");

@@ -1280,8 +1280,8 @@ Position* MoveToPosition(Position& position, const std::string& move) {
   }
   Move info;
   int64_t current = (int64_t)move.length() - 1;
-  if (pieces.count(move[0])) {
-    info.piece = move[0];
+  if (pieces.count(toupper(move[0]))) {
+    info.piece = toupper(move[0]);
   } else {
     info.piece = 'P';
   }
@@ -3464,10 +3464,10 @@ if (!std::filesystem::exists(data_path)) {
         continue;
       } else if (game_over) {
         new_position = nullptr;
-      } else if (!std::regex_match(move, move_input_regex)) {
+      } else if (!std::regex_match(lower_move, move_input_regex)) {
         new_position = nullptr;
       } else {
-        new_position = MoveToPosition(*position, move);
+        new_position = MoveToPosition(*position, lower_move);
       }
       if (new_position != nullptr) {
         stop_mutex.lock();
