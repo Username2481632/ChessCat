@@ -34,9 +34,13 @@ std::string GetUserInput(std::string question, std::string error_message,
 
 
 std::string AppDataPath() {
-  char* buf;
+  char* buf = NULL;
   size_t len;
   _dupenv_s(&buf, &len, "APPDATA");
+  if (!buf) {
+    std::cout << "Could not find app data path.\n";
+    exit(1);
+  }
   std::string path(buf);
   free(buf);
   return path;
