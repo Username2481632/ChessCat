@@ -424,6 +424,7 @@ size_t CountPieceMoves(Position& position, size_t& i, const Check& check_info) {
         if (position.board[i].type == 'B') {
           break;
         }
+        [[fallthrough]];
       case 'R':
         if (check_info.king_must_move) {
           break;
@@ -881,6 +882,7 @@ void new_generate_moves(Position& position) {
           if (position.board[i].type == 'B') {
           break;
           }
+          [[fallthrough]];
       case 'R':
           if (check_info.king_must_move) {
           break;
@@ -2372,6 +2374,7 @@ std::string GetMove(Position& position1, Position& position2) {
         output << (char)('a' + (dest & 7)) << (8 - (dest >> 3));
         break;
       }
+      [[fallthrough]];
     case 'R':
       if (position1.board[origin].type ==
           'R') {
