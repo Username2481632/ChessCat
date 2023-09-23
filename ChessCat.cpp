@@ -3204,6 +3204,10 @@ if (!std::filesystem::exists(data_path)) {
         engine_white = GetEngineColorInput();
         *info->engine_white = engine_white;
         *info->engine_on = true;
+        assert(!engine_color_initialized);
+        engine_color_initialized = true;
+        *info->stop = false;
+        stop_cv.notify_one();
       }
       if (CountMaterial(*position) < adaptive_off_threshold) {
         *adaptive = false;
