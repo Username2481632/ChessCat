@@ -1299,8 +1299,8 @@ Position* MoveToPosition(Position& position, const std::string& move) {
     info.checkmate = true;
     current--;
   }
-  if (pieces.count(move[(size_t)current])) {
-    info.promotion = move[(size_t)current];
+  if (pieces.count(toupper(move[(size_t)current]))) {
+    info.promotion = toupper(move[(size_t)current]);
     current -= 2;
   }
   info.dest = 8UL * (8UL - char_to_size_t(move[(size_t)current]));
