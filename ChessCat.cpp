@@ -3287,10 +3287,14 @@ if (!std::filesystem::exists(data_path)) {
                "describe the game.\nDeleteGameTag       Delete a tag from the "
                "stored game info.\nToMove              View which side is to "
                "move.\nSetAdaptive         Set adaptive on or off.\nIsAdaptive "
-               "         View whether adaptive mode is on.\nShowTools           Choose which tools should be displayed."
+               "         View whether adaptive mode is on.\nManageTools         Choose which tools should be displayed.\nViewSlots           View the current slots.\n"
             << std::endl;
         continue;
-      } else if (lower_move == "showtools") {
+      } else if (lower_move == "viewslots") {
+        Slots slots = GetSlots();
+        LogSlots(slots);
+        continue;
+      } else if (lower_move == "managetools") {
         std::cout << "Available tools:\n";
         size_t indent = 10;
         for (size_t i = 0; i < tools.size(); i++) {
@@ -3299,12 +3303,12 @@ if (!std::filesystem::exists(data_path)) {
           }
         }
         Slots tool_set;
-
+        std::cout << std::string(indent + 1, '=') << std::endl;
         for (size_t i = 0; i < tools.size(); i++) {
-          tool_set.insert(tools[i].name);
+          tool_set.insert(ToLower(tools[i].name));
           std::cout << tools[i].name
-                    << (indent - tools[i].name.length()) * ' '
-                    << tools[i].on;
+                    << std::string((indent - tools[i].name.length()), ' ')
+                    << tools[i].on << std::endl << std::string(indent + 1, '=') << std::endl;
         }
 
         std::string selected_tool = GetUserInput(
@@ -3313,7 +3317,7 @@ if (!std::filesystem::exists(data_path)) {
         size_t index = 0;
         for (;; index++) {
           assert(index < tools.size());
-          if (tools[index].name == selected_tool) {
+          if (ToLower(tools[index].name) == selected_tool) {
             break;
           }
         }
