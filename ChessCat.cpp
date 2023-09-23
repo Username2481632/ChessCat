@@ -3290,8 +3290,14 @@ if (!std::filesystem::exists(data_path)) {
                "describe the game.\nDeleteGameTag       Delete a tag from the "
                "stored game info.\nToMove              View which side is to "
                "move.\nSetAdaptive         Set adaptive on or off.\nIsAdaptive "
-               "         View whether adaptive mode is on.\nManageTools         Choose which tools should be displayed.\nViewSlots           View the current slots.\n"
+               "         View whether adaptive mode is on.\nManageTools        "
+               " Choose which tools should be displayed.\nViewSlots           "
+               "View the current slots.\nGamesPath           View the path to "
+               "the folder in which games are stored.\n"
             << std::endl;
+        continue;
+      } else if (lower_move == "gamespath") {
+        std::cout << games_folder_path << std::endl;
         continue;
       } else if (lower_move == "viewslots") {
         Slots slots = GetSlots();
