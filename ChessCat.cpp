@@ -3117,7 +3117,7 @@ if (!std::filesystem::exists(data_path)) {
                  Tool(std::string("ShowEngineEvaluation"),
                       &ShowEngineEvaluation, true),
       Tool(std::string("ShowEngineLine"), &ShowEngineLine,
-           false),
+           true),
       Tool(std::string("ShowMoveCount"), &ShowMoveCount, false),
       Tool(std::string("ShowMaterialCount"), &ShowMaterialCount,
            false)};
