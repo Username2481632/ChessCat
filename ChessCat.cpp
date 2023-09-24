@@ -3378,6 +3378,7 @@ if (!std::filesystem::exists(data_path)) {
       } else if (lower_move == "tomove") {
         std::cout << "It is " << (position->white_to_move ? "white" : "black")
                   << " to move.\n";
+        continue;
       } else if (lower_move == "addgametag") {
         std::cout << "This function is not done." << std::endl;
         continue;
