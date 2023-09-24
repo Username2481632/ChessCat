@@ -2209,7 +2209,7 @@ const std::string game_folder_name = "games";
 std::string SlotToPath(std::string slot) {
   return (std::filesystem::path(games_folder_path) / std::filesystem::path(slot))
              .string() +
-         "_PGN_position.txt";
+         "_PGN_position.pgn";
 }
 
 
@@ -2820,7 +2820,7 @@ void LogGameEnd(const Position& position, const int &game_status) {
 //  }
 //}
 
-const std::regex file_regex(R"regex((.+)_PGN_position.txt)regex");
+const std::regex file_regex(R"regex((.+)_PGN_position.pgn)regex");
 
 
 using Slots = std::set<std::string>;
@@ -2837,7 +2837,7 @@ Slots GetSlots() {
     if (std::regex_search(x, file_name_match, file_regex)) {
       slots.insert(file_name_match[1].str());
     } else {
-      std::cout << " [WARNING: UNKNOWN FILE IN GAMES] ";
+      std::cout << "WARNING: UNKNOWN FILE IN GAMES!\n";
     }
   }
   //std::sort(slots.begin(), slots.end());
