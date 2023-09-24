@@ -1286,8 +1286,8 @@ Position* MoveToPosition(Position& position, const std::string& move) {
   }
   Move info;
   int64_t current = (int64_t)move.length() - 1;
-  if (pieces.count(toupper(move[0]))) {
-    info.piece = toupper(move[0]);
+  if (pieces.count((char)toupper(move[0]))) {
+    info.piece = (char)toupper(move[0]);
   } else {
     info.piece = 'P';
   }
@@ -1299,8 +1299,8 @@ Position* MoveToPosition(Position& position, const std::string& move) {
     info.checkmate = true;
     current--;
   }
-  if (pieces.count(toupper(move[(size_t)current]))) {
-    info.promotion = toupper(move[(size_t)current]);
+  if (pieces.count((char)toupper(move[(size_t)current]))) {
+    info.promotion = (char)toupper(move[(size_t)current]);
     current -= 2;
   }
   info.dest = 8UL * (8UL - char_to_size_t(move[(size_t)current]));
