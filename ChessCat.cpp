@@ -1286,7 +1286,7 @@ Position* MoveToPosition(Position& position, const std::string& move) {
   }
   Move info;
   int64_t current = (int64_t)move.length() - 1;
-  if (pieces.count((char)toupper(move[0]))) {
+  if (pieces.count((char)toupper(move[0])) && move.length() > 2) {
     info.piece = (char)toupper(move[0]);
   } else {
     info.piece = 'P';
@@ -2043,7 +2043,7 @@ int FindMinDepth(Position& position, bool adaptive) {
   if (!position.outcomes) {
     new_generate_moves(position);
   }
-  double branching_factor = (double)CountMoves(position) / 2.0;
+  double branching_factor = (double)CountMoves(position) / 2.0; // sqrt?
  for (size_t i = 0; i < position.outcomes->size(); i++) {
     if ((*position.outcomes)[i]->was_capture) {
       branching_factor++;
