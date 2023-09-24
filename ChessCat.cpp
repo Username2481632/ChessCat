@@ -1956,9 +1956,6 @@ std::vector<Position*> GetLine(Position* position) {
     position = GetBestMove(position);
     line.emplace_back(position);
   }
-  if (line.size() == 0) {
-    int w = 4;
-  }
   return line;
 }
 
