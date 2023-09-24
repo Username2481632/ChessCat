@@ -3301,6 +3301,9 @@ if (!std::filesystem::exists(data_path)) {
                "the folder in which games are stored.\n"
             << std::endl;
         continue;
+      } else if (lower_move == "viewcurrentslot") {
+        std::cout << "The current slot is: " << slot << std::endl;
+        continue;
       } else if (lower_move == "gamespath") {
         std::cout << games_folder_path << std::endl;
         continue;
