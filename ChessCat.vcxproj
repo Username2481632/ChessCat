@@ -106,6 +106,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DisableSpecificWarnings>5045; 4668; 4820</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>C:\Users\micha\vcpkg\vcpkg\packages\jsoncpp_x64-windows\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

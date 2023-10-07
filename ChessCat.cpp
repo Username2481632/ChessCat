@@ -3035,6 +3035,12 @@ void DisplayStats(Position& position, Tools tools) {
 
 int main() {
   thread_count++;
+  Json::StreamWriter* writer;
+  {
+      Json::StreamWriterBuilder builder;
+      builder["indentation"] = "  ";
+      writer = builder.newStreamWriter();
+  }
   // while (true) {
   Position* position = Position::StartingPosition();
   std::cout << std::setprecision(7);
@@ -3046,8 +3052,35 @@ if (!std::filesystem::exists(data_path)) {
   games_folder_path = data_path +
                       (char)std::filesystem::path::preferred_separator +
                       game_folder_name;
+  std::string default_settings_file_path =
+      data_path + "\\default_settings.json";
+  if (!std::filesystem::exists(games_folder_path)) {
+      std::filesystem::create_directory(games_folder_path);
+  }
+
+  for (const std::filesystem::directory_entry entry :
+       std::filesystem::directory_iterator(games_folder_path)) {
+      if (std::regex_match(entry.path().string(),
+                           std::regex(R"regex(".*_PGN_position\.txt")regex"))) {
+      std::string new_name =
+          (games_folder_path + "\\" +
+           entry.path().string().substr(0, entry.path().string().length() - 3) +
+           "pgn");
+      if (rename((games_folder_path + "\\" + entry.path().string()).c_str(),
+                 new_name.c_str())) {
+        std::cout << "Failed to rename \"" +
+                         (games_folder_path + "\\" + entry.path().string()) +
+                         "\" to \"" + new_name + "\".";
+        exit(1);
+      }
+      }
+  }
+  
   bool confirmation = false;
   std::string slot;
+  Json::Value settings;
+  // load from default_settings.json
+  std::filesystem::path settings_file_path;
   while (!confirmation) {
       std::string response;
       std::cout << "Resume? ";
@@ -3074,6 +3107,37 @@ if (!std::filesystem::exists(data_path)) {
         }
         slot = response;
         position = ReadPGN(position, SlotToPath(slot));
+          bool read_settings =
+              GetUserInput("Load game settings? ",
+                           "Load game settings (please enter \"1\" or \"0\")? ",
+                           {"1", "0"}) == "1";
+          if (read_settings) {
+            settings_file_path = (std::filesystem::path(games_folder_path) /
+                    std::filesystem::path(slot + settings_file_extension));
+            if (std::filesystem::exists(
+                    settings_file_path)) {
+            std::ifstream file(settings_file_path);
+            Json::Reader reader;
+            reader.parse(file, settings);
+            file.close();
+
+            } else {
+            Json::Value default_settings;
+            if (!std::filesystem::exists(default_settings_file_path)) {
+              std::ofstream file(default_settings_file_path);
+              file.close();
+            }
+            std::ifstream file(default_settings_file_path);
+            Json::Reader reader;
+            reader.parse(file, default_settings);
+            file.close();
+            settings = default_settings;
+              // create default settings json file
+            std::ofstream settings_file(settings_file_path);
+            writer->write(settings, &settings_file);
+            settings_file.close();
+            }
+          }
         break;
       }
       } else {
@@ -3098,10 +3162,6 @@ if (!std::filesystem::exists(data_path)) {
         }
       }
       slot = target_slot;
-
-      if (!std::filesystem::exists(games_folder_path)) {
-        std::filesystem::create_directory(games_folder_path);
-      }
       std::ofstream file;
       file.open(SlotToPath(slot));
       file << "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round "
