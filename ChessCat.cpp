@@ -2196,7 +2196,10 @@ void calculate_moves(void* varg) {
         threads_maxed = true;
       }
       t_c_mutex.unlock();
-      _beginthread(DeleteOutcomes, 0, arg);
+      if (_beginthread(DeleteOutcomes, 0, arg) == -1L) {
+        std::cout << "Error starting DeleteOutcomes thread.";
+        exit(1);
+    }
     }
     if (input->trash->size() > 0) {
       input->trash->clear();
