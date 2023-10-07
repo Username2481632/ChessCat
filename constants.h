@@ -1,7 +1,10 @@
 #pragma once
 
+#include <json/json.h>
+
 #include <map>
 #include <regex>
+
 #include "types.h"
 
 extern std::map<char, double> piece_values;
@@ -16,3 +19,5 @@ extern const int mate;
 extern const double adaptive_off_threshold;
 extern const std::regex move_input_regex;
 extern const std::regex PGN_moves_regex;
+extern const std::string settings_file_extension;
+extern const std::string default_default_settings;

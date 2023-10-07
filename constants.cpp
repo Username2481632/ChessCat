@@ -47,3 +47,5 @@ const std::regex move_input_regex(
     R"regex([Oo0]-[Oo0](-[Oo0])?|[kqrbn]?[a-h]?[1-8]?x?[a-h][1-8](\=[qrbn])?[+#]?)regex");
 const std::regex PGN_moves_regex(
     R"regex(\d{1,}\.{1,3}\s?(?:([Oo0]-[Oo0](?:-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:\=[QRBN])?[+#]?)(?:\s?\{.+?\})?(?:\s(?:1-0|0-1|1\/2-1\/2))?\s?)(?:([Oo0]-[Oo0](?:-[Oo0])?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:\=[QRBN])?[+#]?)(?:\s?\{.+?\})?(?:\s(?:1-0|0-1|1\/2-1\/2))?\s?)?)regex");
+const std::string settings_file_extension = "_settings.json";
+const std::string default_default_settings = "{\"engine_white\" : true, \"white_on_bottom\": true}";
