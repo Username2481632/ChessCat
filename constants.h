@@ -21,3 +21,4 @@ extern const std::regex move_input_regex;
 extern const std::regex PGN_moves_regex;
 extern const std::string settings_file_extension;
 extern const std::string default_default_settings;
+extern const int king_value;
